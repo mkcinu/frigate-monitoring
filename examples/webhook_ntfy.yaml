@@ -1,0 +1,17 @@
+# Send push notifications via ntfy.sh for every completed alert.
+#
+# Usage: frigate-monitor --config examples/webhook_ntfy.yaml
+#
+# Required environment variables:
+#   NTFY_TOPIC — your ntfy.sh topic name (e.g. "my-frigate-alerts")
+
+actions:
+  - type: webhook
+    url: "https://ntfy.sh/${NTFY_TOPIC}"
+    body:
+      topic: "${NTFY_TOPIC}"
+      title: "Frigate alert"
+      message: "{camera}: {label} ({score_pct})"
+    filter:
+      alerts_only: true
+      review_types: [end]

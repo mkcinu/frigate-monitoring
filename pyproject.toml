@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "frigate-monitoring"
+version = "0.1.0"
+description = "Subscribe to Frigate NVR MQTT events and dispatch them to configurable action handlers"
+requires-python = ">=3.12"
+dependencies = ["paho-mqtt>=2.0", "trio>=0.27", "httpx>=0.27", "python-dotenv>=1.0", "attrs>=23.1", "cattrs>=23.1", "pyyaml>=6.0", "rich>=13.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0", "pytest-trio>=0.8"]
+
+[project.scripts]
+frigate-monitor = "frigate_monitoring.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ── Black ──────────────────────────────────────────────────────────────────────
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+# ── mypy ───────────────────────────────────────────────────────────────────────
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+# Extra strictness on top of --strict
+warn_return_any = true
+warn_unused_configs = true
+warn_unreachable = true
+no_implicit_reexport = true
+strict_equality = true
+extra_checks = true
+
+# paho-mqtt ships py.typed; override only if import errors appear
+[[tool.mypy.overrides]]
+module = "paho.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "yaml.*"
+ignore_missing_imports = true
+
+# ── isort ──────────────────────────────────────────────────────────────────────
+
+[tool.isort]
+profile = "black"
+src_paths = ["src", "examples"]
+
+# ── pytest (future) ────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+trio_mode = true

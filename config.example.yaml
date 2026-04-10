@@ -1,0 +1,55 @@
+mqtt:
+  host: 192.168.1.100
+  port: 1883
+  # user: mqtt_user
+  # password: mqtt_pass
+  # topic: frigate/reviews  # default
+
+frigate:
+  host: 192.168.1.100
+  port: 5000
+  # external_url: https://frigate.example.com
+
+actions:
+  # Print completed alerts to stdout
+  - type: print
+    template: "[{camera}] {label} ({score_pct}) — {objects}"
+    filter:
+      review_types: [end]
+      alerts_only: true
+
+  # Log all reviews
+  - type: log
+    level: INFO
+
+  # Send a webhook for alerts
+  - type: webhook
+    url: https://hooks.example.com/frigate
+    method: POST
+    body:
+      text: "{label} detected on {camera} ({score_pct})"
+      camera: "{camera}"
+      snapshot: "{snapshot_url}"
+    headers:
+      Authorization: "Bearer ${WEBHOOK_TOKEN}"
+    filter:
+      alerts_only: true
+      review_types: [end]
+
+  # Pushover mobile notification
+  # - type: pushover
+  #   token: ${PUSHOVER_TOKEN}
+  #   user_key: ${PUSHOVER_USER}
+  #   title: "Frigate: {label} on {camera}"
+  #   message: "{label} detected ({score_pct})"
+  #   attach_snapshot: true
+  #   options:
+  #     sound: siren
+  #     priority: 1
+  #   filter:
+  #     alerts_only: true
+  #     review_types: [end]
+
+# Record MQTT messages for later replay / testing
+# record:
+#   path: recordings/mqtt.jsonl

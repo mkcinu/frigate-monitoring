@@ -1,0 +1,7 @@
+# Live rich terminal display — watch reviews update in real time.
+#
+# Usage: frigate-monitor --config examples/rich_display.yaml
+# Requires: pip install frigate-monitoring[rich]
+
+actions:
+  - type: rich

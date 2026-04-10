@@ -1,0 +1,69 @@
+[MAIN]
+# Use all available CPU cores for parallel linting.
+jobs = 0
+
+# Fail if the final score is below this threshold.
+fail-under = 9.5
+
+# Ignore generated / vendored directories.
+ignore = .venv, __pycache__, .git
+
+[MESSAGES CONTROL]
+# Keep all checks enabled; disable only what is genuinely not useful here.
+enable = all
+
+disable =
+    # Allow TODO / FIXME comments during development.
+    fixme,
+    # Don't emit meta-messages about inline pylint disables.
+    locally-disabled,
+    suppressed-message,
+    # Lazy imports keep optional deps out of the hot path.
+    import-outside-toplevel,
+
+[FORMAT]
+# Match Black's default line length.
+max-line-length = 88
+
+# Enforce 4-space indentation.
+indent-string = "    "
+
+[DESIGN]
+max-args                  = 10
+max-positional-arguments  = 10
+max-attributes            = 16
+max-bool-expr             = 5
+max-branches              = 12
+max-locals                = 15
+max-parents               = 7
+max-public-methods        = 20
+max-returns               = 8
+max-statements            = 50
+min-public-methods        = 1
+
+[BASIC]
+# Short names that are universally accepted.
+good-names = i, j, k, e, f, _, id, log, qs
+
+# Require all modules, classes, functions, and methods to be documented.
+# (These are enabled by default; listed here for explicitness.)
+
+[LOGGING]
+# Prefer %-formatting in logging calls (avoids eager string evaluation).
+logging-format-style = old
+
+[SIMILARITIES]
+min-similarity-lines = 4
+ignore-comments      = yes
+ignore-docstrings    = yes
+ignore-imports       = yes
+
+[EXCEPTIONS]
+# Flag broad exception catches unless explicitly suppressed.
+overgeneral-exceptions = builtins.Exception
+
+[REPORTS]
+# Show a full report in CI; terse output locally.
+output-format = text
+reports       = no
+score         = yes

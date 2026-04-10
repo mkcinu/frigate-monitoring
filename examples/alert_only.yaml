@@ -1,0 +1,15 @@
+# Print alert-severity reviews with media URLs.
+#
+# Usage: frigate-monitor --config examples/alert_only.yaml
+
+actions:
+  - type: print
+    template: |
+
+      [{camera}] {label} ({score_pct})
+        snapshot : {snapshot_url}
+        gif      : {gif_url}
+        clip     : {clip_url}
+    filter:
+      alerts_only: true
+      review_types: [end]

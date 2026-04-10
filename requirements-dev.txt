@@ -1,0 +1,9 @@
+-r requirements.txt
+black>=24.0
+isort>=5.13
+pylint>=3.0
+mypy>=1.10
+requests>=2.31       # used in examples/callback_ntfy.py
+types-requests>=2.31 # mypy stubs for requests
+pdoc>=14.0
+pydoc-markdown>=4.8

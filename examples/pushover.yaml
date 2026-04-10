@@ -1,0 +1,17 @@
+# Send Pushover notifications for alert reviews.
+#
+# Usage: frigate-monitor --config examples/pushover.yaml
+#
+# Required environment variables:
+#   PUSHOVER_TOKEN   — your Pushover application API token
+#   PUSHOVER_USER    — your Pushover user key
+
+actions:
+  - type: pushover
+    token: ${PUSHOVER_TOKEN}
+    user_key: ${PUSHOVER_USER}
+    message: "{label} detected ({score_pct})."
+    url: "{external_gif_url}"
+    url_title: View GIF
+    filter:
+      review_types: [new, end]

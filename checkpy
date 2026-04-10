@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""checkpy — run all code-quality tools on every .py file in the project.
+
+Usage:
+    python checkpy          # check only (exits 1 on any failure)
+    python checkpy --fix    # auto-fix what can be fixed, then check the rest
+"""
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+EXCLUDE_DIRS = {".venv", "__pycache__", ".git", ".mypy_cache", ".pytest_cache"}
+
+
+def find_py_files(root: Path) -> list[Path]:
+    return sorted(
+        p
+        for p in root.rglob("*.py")
+        if not EXCLUDE_DIRS.intersection(p.parts)
+    )
+
+
+def run_tool(label: str, cmd: list[str]) -> bool:
+    print(f"── {label} ──")
+    ok = subprocess.run(cmd, check=False).returncode == 0
+    print("   OK" if ok else "   FAILED")
+    print()
+    return ok
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run code-quality tools.")
+    parser.add_argument("--fix", action="store_true", help="Auto-fix where possible.")
+    args = parser.parse_args()
+
+    root = Path(__file__).resolve().parent
+    files = [str(p) for p in find_py_files(root)]
+
+    if not files:
+        print("No Python files found.")
+        sys.exit(0)
+
+    py = sys.executable
+    results: list[bool] = []
+
+    def check(label: str, cmd: list[str]) -> None:
+        results.append(run_tool(label, cmd))
+
+    if args.fix:
+        check("isort (fix)", [py, "-m", "isort", *files])
+        check("black (fix)", [py, "-m", "black", *files])
+    else:
+        check("isort", [py, "-m", "isort", "--check-only", "--diff", *files])
+        check("black", [py, "-m", "black", "--check", "--diff", *files])
+
+    check("pytest", [py, "-m", "pytest", "tests/", "-q"])
+    check("mypy",   [py, "-m", "mypy", *files])
+
+    test_dir = str(root / "tests")
+    src_files = [f for f in files if not f.startswith(test_dir)]
+    test_files = [f for f in files if f.startswith(test_dir)]
+    if src_files:
+        check("pylint (src)", [py, "-m", "pylint", *src_files])
+    if test_files:
+        check("pylint (tests)", [
+            py, "-m", "pylint",
+            "--disable=missing-function-docstring,missing-class-docstring,"
+            "protected-access,redefined-outer-name,"
+            "use-implicit-booleaness-not-comparison,"
+            "use-implicit-booleaness-not-comparison-to-string",
+            *test_files,
+        ])
+
+    passed = sum(results)
+    failed = len(results) - passed
+    print("══════════════════════════════════")
+    print(f"  passed: {passed}   failed: {failed}")
+    print("══════════════════════════════════")
+    sys.exit(0 if failed == 0 else 1)
+
+
+if __name__ == "__main__":
+    main()
