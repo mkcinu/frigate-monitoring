@@ -384,6 +384,7 @@ python checkpy                 # all quality tools should pass
 
 ```bash
 pdoc src/frigate_monitoring          # open live docs in the browser
+pdoc src/frigate_monitoring --output-dir docs/  # generate static HTML docs
 ```
 
 ## Code quality
