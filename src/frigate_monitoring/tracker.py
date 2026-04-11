@@ -49,18 +49,43 @@ def pick_best(events: Sequence[FrigateEvent]) -> FrigateEvent | None:
 
 @attrs.define
 class TrackedReview:
-    """State accumulated for a single review across its MQTT lifecycle."""
+    """State accumulated for a single review across its MQTT lifecycle.
+
+    A Frigate review spans multiple MQTT messages (new → update… → end).
+    This class holds the living state so we can:
+
+    * accumulate all events and continuously pick the best by score
+    * remember which actions already fired their ``"start"`` trigger,
+      so each action fires at most once per review (keyed by the
+      action's index in the listener's action list)
+    * remember the best event at ``"start"`` time so ``"best"`` can be
+      skipped when the best event hasn't changed
+    """
 
     review: FrigateReview
     events: dict[str, FrigateEvent] = attrs.field(factory=dict[str, FrigateEvent])
     best_event: FrigateEvent | None = attrs.field(default=None)
-    _started: dict[int, bool] = attrs.field(factory=dict)
+    _started_actions: dict[int, bool] = attrs.field(factory=dict[int, bool])
+    _start_event_ids: dict[int, str] = attrs.field(factory=dict[int, str])
 
     def mark_started(self, action_idx: int) -> None:
-        self._started[action_idx] = True
+        """Record that action *action_idx* has fired its ``"start"`` trigger."""
+        self._started_actions[action_idx] = True
+        if self.best_event is not None:
+            self._start_event_ids[action_idx] = self.best_event.event_id
 
     def has_started(self, action_idx: int) -> bool:
-        return self._started.get(action_idx, False)
+        """Return whether action *action_idx* already fired ``"start"``."""
+        return self._started_actions.get(action_idx, False)
+
+    def best_changed_since_start(self, action_idx: int) -> bool:
+        """Return whether the best event differs from what it was at ``"start"`` time."""
+        start_eid = self._start_event_ids.get(action_idx)
+        if start_eid is None:
+            return True
+        if self.best_event is None:
+            return True
+        return self.best_event.event_id != start_eid
 
     def add_events(self, new_events: list[FrigateEvent]) -> None:
         """Merge newly fetched events and re-evaluate the best."""
@@ -79,7 +104,7 @@ class ReviewTracker:
     """
 
     _max_tracked: int = 10_000
-    _reviews: dict[str, TrackedReview] = attrs.field(factory=dict)
+    _reviews: dict[str, TrackedReview] = attrs.field(factory=dict[str, TrackedReview])
 
     def update(self, review: FrigateReview) -> TrackedReview:
         """Create or update the tracked state for *review*.
@@ -117,13 +142,27 @@ class ReviewTracker:
         return self._reviews.get(review_id)
 
     async def resolve_events(self, tracked: TrackedReview) -> None:
-        """Fetch all events from the current review and re-evaluate the best.
+        """Fetch events and re-evaluate the best.
 
-        Re-fetches every event ID in the review to pick up updated scores and
-        snapshot availability from Frigate.
+        On intermediate messages (new/update): only fetches event IDs not yet
+        cached, since we just need to discover new detections.
+
+        On end: re-fetches all events to pick up final scores and snapshots
+        (Frigate continuously improves these while the object is tracked).
         """
         review = tracked.review
         if not review.event_ids:
+            return
+
+        is_end = review.review_type == "end"
+        if is_end:
+            ids_to_fetch = review.event_ids
+        else:
+            ids_to_fetch = [
+                eid for eid in review.event_ids if eid not in tracked.events
+            ]
+
+        if not ids_to_fetch:
             return
 
         new_events: list[FrigateEvent] = []
@@ -146,7 +185,7 @@ class ReviewTracker:
                 log.warning("Could not fetch event %s: %s", eid, exc)
 
         async with trio.open_nursery() as nursery:
-            for eid in review.event_ids:
+            for eid in ids_to_fetch:
                 nursery.start_soon(_fetch, eid)
 
         old_best = tracked.best_event

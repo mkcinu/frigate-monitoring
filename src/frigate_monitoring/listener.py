@@ -203,8 +203,16 @@ class FrigateListener:
                             review.trigger = "start"
                             nursery.start_soon(self._safe_handle, action, review)
                     if is_end and filt.matches(review, trigger="best"):
-                        review.trigger = "best"
-                        nursery.start_soon(self._safe_handle, action, review)
+                        if tracked.best_changed_since_start(action_idx):
+                            review.trigger = "best"
+                            nursery.start_soon(self._safe_handle, action, review)
+                        else:
+                            log.debug(
+                                "Skipping 'best' for review %s action %d:"
+                                " same event as 'start'",
+                                review.review_id,
+                                action_idx,
+                            )
                 else:
                     if filt.matches(review):
                         nursery.start_soon(self._safe_handle, action, review)

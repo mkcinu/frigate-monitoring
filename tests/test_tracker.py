@@ -162,3 +162,27 @@ class TestReviewTracker:
         assert len(tracked.events) == 1
         assert tracked.best_event is not None
         assert tracked.best_event.top_score == 0.95
+
+    def test_best_changed_since_start_when_same(self) -> None:
+        tracker = ReviewTracker()
+        review = _review()
+        tracked = tracker.update(review)
+        tracked.add_events([_event(event_id="ev1", top_score=0.9)])
+        tracked.mark_started(action_idx=0)
+        assert not tracked.best_changed_since_start(action_idx=0)
+
+    def test_best_changed_since_start_when_different(self) -> None:
+        tracker = ReviewTracker()
+        review = _review()
+        tracked = tracker.update(review)
+        tracked.add_events([_event(event_id="ev1", top_score=0.5)])
+        tracked.mark_started(action_idx=0)
+        tracked.add_events([_event(event_id="ev2", top_score=0.95)])
+        assert tracked.best_changed_since_start(action_idx=0)
+
+    def test_best_changed_since_start_without_start(self) -> None:
+        tracker = ReviewTracker()
+        review = _review()
+        tracked = tracker.update(review)
+        tracked.add_events([_event(event_id="ev1", top_score=0.9)])
+        assert tracked.best_changed_since_start(action_idx=0)
