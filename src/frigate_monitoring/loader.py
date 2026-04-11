@@ -72,7 +72,7 @@ _ACTION_REGISTRY: dict[str, tuple[str, str]] = {
     "rich": ("frigate_monitoring.actions.rich_action", "RichAction"),
 }
 
-_converter = cattrs.Converter()
+_converter = cattrs.Converter(forbid_extra_keys=True)
 _converter.register_structure_hook(
     time,
     lambda v, _: v if isinstance(v, time) else time.fromisoformat(str(v)),
