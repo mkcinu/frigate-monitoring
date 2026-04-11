@@ -83,6 +83,15 @@ actions:
       alerts_only: true
       triggers: [best]
 
+  - type: slack
+    bot_token: ${SLACK_BOT_TOKEN}
+    channel: ${SLACK_CHANNEL}   # must be a channel ID, e.g. C0123456789
+    message: "*{label}* ({score_pct}) on *{camera}* | zones: {zones}"
+    attach_gif: true
+    filter:
+      alerts_only: true
+      triggers: [best]
+
 # Record MQTT messages to a file for later replay
 # record:
 #   path: recordings/mqtt.jsonl
@@ -106,6 +115,7 @@ frigate-monitor --config config.yaml
 | `CallbackAction(fn)` | _(Python only)_ | Call an arbitrary `fn(review)` function |
 | `WebhookAction(url, method, body, headers)` | `webhook` | Send an HTTP request to any URL |
 | `PushoverAction(token, user_key)` | `pushover` | Send Pushover push notifications |
+| `SlackAction(bot_token, channel)` | `slack` | Send Slack messages with optional GIF/snapshot upload |
 | `RichAction()` | `rich` | Live-updating terminal table via [rich](https://github.com/Textualize/rich) |
 
 ### ReviewFilter
@@ -233,6 +243,7 @@ python -m frigate_monitoring
 # Or run one of the YAML examples:
 frigate-monitor --config examples/alert_only.yaml
 frigate-monitor --config examples/pushover.yaml
+frigate-monitor --config examples/slack.yaml
 frigate-monitor --config examples/webhook_ntfy.yaml
 frigate-monitor --config examples/rich_display.yaml
 

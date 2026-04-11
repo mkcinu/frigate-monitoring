@@ -69,6 +69,7 @@ _ACTION_REGISTRY: dict[str, tuple[str, str]] = {
     "log": ("frigate_monitoring.actions.log_action", "LogAction"),
     "webhook": ("frigate_monitoring.actions.webhook", "WebhookAction"),
     "pushover": ("frigate_monitoring.actions.pushover", "PushoverAction"),
+    "slack": ("frigate_monitoring.actions.slack", "SlackAction"),
     "rich": ("frigate_monitoring.actions.rich_action", "RichAction"),
 }
 
