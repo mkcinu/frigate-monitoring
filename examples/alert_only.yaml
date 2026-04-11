@@ -12,4 +12,4 @@ actions:
         clip     : {clip_url}
     filter:
       alerts_only: true
-      review_types: [end]
+      triggers: [best]

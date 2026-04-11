@@ -7,7 +7,7 @@ from datetime import datetime, time
 import attrs
 
 from frigate_monitoring.review import FrigateReview
-from frigate_monitoring.types import ReviewType
+from frigate_monitoring.types import Trigger
 
 
 @attrs.define
@@ -19,20 +19,24 @@ class ReviewFilter:
 
     Examples
     --------
-    Only alert reviews from the front or back door::
+    Immediate alert from the front or back door::
 
         ReviewFilter(
             cameras=["front_door", "back_door"],
+            triggers=["start"],
             alerts_only=True,
         )
 
-    Any completed review that includes a person::
+    Best-quality notification when a person review ends::
 
-        ReviewFilter(review_types=["end"], objects=["person"])
+        ReviewFilter(triggers=["best"], objects=["person"])
 
     Only reviews that start during nighttime hours (wraps midnight)::
 
-        ReviewFilter(time_range=(time(22, 0), time(6, 0)))
+        ReviewFilter(
+            triggers=["start", "best"],
+            time_range=(time(22, 0), time(6, 0)),
+        )
     """
 
     cameras: list[str] | None = None
@@ -41,8 +45,10 @@ class ReviewFilter:
     objects: list[str] | None = None
     """Restrict to reviews containing at least one of these object types."""
 
-    review_types: list[ReviewType] | None = None
-    """Restrict to these review lifecycle stages."""
+    triggers: list[Trigger] | None = None
+    """Semantic triggers: ``"start"`` fires on the first matching message,
+    ``"best"`` fires once at review end with the best event.
+    ``None`` matches on every MQTT message (new, update, end)."""
 
     alerts_only: bool = False
     """When ``True``, skip detection-severity reviews and only handle alerts."""
@@ -58,14 +64,23 @@ class ReviewFilter:
     matches 22:00-06:00.
     """
 
-    def matches(self, review: FrigateReview) -> bool:
-        """Return ``True`` if *review* satisfies every configured criterion."""
+    def matches(self, review: FrigateReview, *, trigger: str | None = None) -> bool:
+        """Return ``True`` if *review* satisfies every configured criterion.
+
+        Parameters
+        ----------
+        trigger:
+            When dispatching via the trigger system, pass ``"start"`` or
+            ``"best"``.  Filters with :attr:`triggers` set will only match
+            when this value is in their trigger list.
+        """
         if self.cameras and review.camera not in self.cameras:
             return False
         if self.objects and not set(review.objects).intersection(self.objects):
             return False
-        if self.review_types and review.review_type not in self.review_types:
-            return False
+        if self.triggers is not None:
+            if trigger is None or trigger not in self.triggers:
+                return False
         if self.alerts_only and not review.is_alert:
             return False
         if self.zones and not set(review.zones).intersection(self.zones):

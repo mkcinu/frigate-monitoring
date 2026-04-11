@@ -30,7 +30,7 @@ def main() -> None:
             url_title="View GIF",
             options=PushoverOptions(ttl=60),
         ),
-        filter=ReviewFilter(alerts_only=False, review_types=["new", "end"]),
+        filter=ReviewFilter(alerts_only=False, triggers=["start", "best"]),
     )
     trio.run(listener.run)
 

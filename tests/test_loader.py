@@ -50,7 +50,7 @@ actions:
     headers:
       X-Custom: test
     filter:
-      review_types: [end]
+      triggers: [best]
 """)
     listener = from_yaml(config_file)
     action, filt = listener._actions[0]
@@ -58,7 +58,7 @@ actions:
     assert action.method == "PUT"
     assert action.body == {"msg": "{label} on {camera}"}
     assert action.headers == {"X-Custom": "test"}
-    assert filt.review_types == ["end"]
+    assert filt.triggers == ["best"]
 
 
 def test_env_var_expansion(tmp_path: Path) -> None:

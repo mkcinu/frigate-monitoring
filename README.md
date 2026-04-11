@@ -32,7 +32,7 @@ from frigate_monitoring.listener import FrigateListener
 listener = FrigateListener()
 listener.add_action(
     PrintAction(template="[{camera}] {label} ({score_pct})"),
-    filter=ReviewFilter(alerts_only=True, review_types=["end"]),
+    filter=ReviewFilter(alerts_only=True, triggers=["best"]),
 )
 listener.run()
 ```
@@ -71,7 +71,7 @@ actions:
       Authorization: "Bearer ${WEBHOOK_TOKEN}"
     filter:
       alerts_only: true
-      review_types: [end]
+      triggers: [best]
 
   - type: pushover
     token: ${PUSHOVER_TOKEN}
@@ -81,7 +81,7 @@ actions:
       priority: 1
     filter:
       alerts_only: true
-      review_types: [end]
+      triggers: [best]
 
 # Record MQTT messages to a file for later replay
 # record:
@@ -116,9 +116,14 @@ ReviewFilter(
     cameras=["front_door"],     # restrict to these cameras
     objects=["person", "car"],  # at least one of these must be present
     zones=["driveway"],         # at least one of these zones must be active
-    review_types=["end"],       # "new", "update", or "end"
+    triggers=["start", "best"], # "start" = first match, "best" = at review end
 )
 ```
+
+**Triggers** control when actions fire during a review's lifecycle:
+- `"start"` — fires once, the first time the review matches the filter (e.g. when
+  severity upgrades from detection to alert for an `alerts_only` filter)
+- `"best"` — fires once when the review ends, with the best event selected by score
 
 All criteria are AND-ed together; omit any to match everything for that dimension.
 
@@ -130,7 +135,7 @@ filter:
   cameras: [front_door]
   objects: [person, car]
   zones: [driveway]
-  review_types: [end]
+  triggers: [start, best]
 ```
 
 ## Configuration

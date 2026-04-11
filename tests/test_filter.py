@@ -51,10 +51,31 @@ def test_objects_filter_any_match() -> None:
     assert f.matches(_review(objects=["dog", "cat"]))
 
 
-def test_review_types_filter() -> None:
-    f = ReviewFilter(review_types=["end"])
+def test_triggers_start() -> None:
+    f = ReviewFilter(triggers=["start"])
+    assert f.matches(_review(), trigger="start")
+    assert not f.matches(_review(), trigger="best")
+    assert not f.matches(_review())
+
+
+def test_triggers_best() -> None:
+    f = ReviewFilter(triggers=["best"])
+    assert f.matches(_review(), trigger="best")
+    assert not f.matches(_review(), trigger="start")
+
+
+def test_triggers_both() -> None:
+    f = ReviewFilter(triggers=["start", "best"])
+    assert f.matches(_review(), trigger="start")
+    assert f.matches(_review(), trigger="best")
+    assert not f.matches(_review())
+
+
+def test_no_triggers_matches_any_message() -> None:
+    f = ReviewFilter()
+    assert f.matches(_review(review_type="new"))
+    assert f.matches(_review(review_type="update"))
     assert f.matches(_review(review_type="end"))
-    assert not f.matches(_review(review_type="new"))
 
 
 def test_alerts_only() -> None:
@@ -109,7 +130,7 @@ def test_combined_filters_all_must_match() -> None:
         cameras=["front_door"],
         objects=["person"],
         alerts_only=True,
-        review_types=["end"],
+        triggers=["best"],
         zones=["yard"],
     )
     assert f.matches(
@@ -117,9 +138,9 @@ def test_combined_filters_all_must_match() -> None:
             camera="front_door",
             objects=["person"],
             severity="alert",
-            review_type="end",
             zones=["yard"],
-        )
+        ),
+        trigger="best",
     )
     # Fails on camera
     assert not f.matches(
@@ -127,9 +148,9 @@ def test_combined_filters_all_must_match() -> None:
             camera="garage",
             objects=["person"],
             severity="alert",
-            review_type="end",
             zones=["yard"],
-        )
+        ),
+        trigger="best",
     )
     # Fails on severity
     assert not f.matches(
@@ -137,7 +158,7 @@ def test_combined_filters_all_must_match() -> None:
             camera="front_door",
             objects=["person"],
             severity="detection",
-            review_type="end",
             zones=["yard"],
-        )
+        ),
+        trigger="best",
     )

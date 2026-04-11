@@ -26,7 +26,7 @@ def main() -> None:
     listener = FrigateListener()
     listener.add_action(
         CallbackAction(print_all_fields),
-        filter=ReviewFilter(review_types=["end"]),
+        filter=ReviewFilter(triggers=["best"]),
     )
     trio.run(listener.run)
 

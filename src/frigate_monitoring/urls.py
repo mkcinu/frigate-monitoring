@@ -36,6 +36,11 @@ def gif_url(event_id: str, *, external: bool = False) -> str:
     return f"{_base(external)}/api/events/{event_id}/preview.gif"
 
 
+def review_gif_url(review_id: str, *, external: bool = False) -> str:
+    """Animated GIF preview covering the full review duration."""
+    return f"{_base(external)}/api/review/{review_id}/preview?format=gif"
+
+
 def latest_snapshot_url(camera: str, *, external: bool = False) -> str:
     """Latest frame from a camera (not tied to a specific event)."""
     return f"{_base(external)}/api/{camera}/latest.jpg"
