@@ -4,3 +4,4 @@ from typing import Literal
 
 ReviewType = Literal["new", "update", "end"]
 Severity = Literal["alert", "detection"]
+Trigger = Literal["start", "best"]

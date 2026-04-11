@@ -14,4 +14,4 @@ actions:
       message: "{camera}: {label} ({score_pct})"
     filter:
       alerts_only: true
-      review_types: [end]
+      triggers: [best]

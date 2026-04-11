@@ -48,11 +48,12 @@ call to the Frigate API on first access:
     {snapshot_url}          URL to a JPEG snapshot of the best event.
     {thumbnail_url}         URL to a small JPEG thumbnail.
     {clip_url}              URL to the MP4 video clip.
-    {gif_url}               URL to an animated GIF of the clip.
+    {gif_url}               Review-level animated GIF covering the full alert window.
+    {trigger}               Trigger that caused this dispatch ("start" or "best").
     {external_snapshot_url} External snapshot URL (requires FRIGATE_EXTERNAL_URL).
     {external_thumbnail_url} External thumbnail URL (requires FRIGATE_EXTERNAL_URL).
     {external_clip_url}     External clip URL (requires FRIGATE_EXTERNAL_URL).
-    {external_gif_url}      External GIF URL (requires FRIGATE_EXTERNAL_URL).
+    {external_gif_url}      External review GIF URL (requires FRIGATE_EXTERNAL_URL).
 """
 
 from __future__ import annotations
@@ -64,6 +65,7 @@ from typing import Any
 import attrs
 import trio
 
+from frigate_monitoring import urls
 from frigate_monitoring.config import get_config
 from frigate_monitoring.event import FrigateEvent
 from frigate_monitoring.types import ReviewType, Severity
@@ -84,6 +86,7 @@ class FrigateReview:
     zones: list[str]
     sub_labels: list[str]
     raw: dict[str, Any] = attrs.field(repr=False, factory=dict[str, Any])
+    trigger: str = attrs.field(default="", repr=False)
     _best_event: FrigateEvent | None = attrs.field(
         default=None, init=False, repr=False, alias="_best_event"
     )
@@ -118,6 +121,11 @@ class FrigateReview:
                 "accessing best_event or any property that depends on it."
             )
         return self._best_event
+
+    @best_event.setter
+    def best_event(self, event: FrigateEvent) -> None:
+        """Set the best event directly (used by the tracker)."""
+        self._best_event = event
 
     @property
     def is_alert(self) -> bool:
@@ -163,8 +171,8 @@ class FrigateReview:
 
     @property
     def gif_url(self) -> str:
-        """Animated GIF URL of the best event."""
-        return self.best_event.gif_url
+        """Review-level animated GIF covering the full alert window."""
+        return urls.review_gif_url(self.review_id)
 
     @property
     def external_snapshot_url(self) -> str:
@@ -183,8 +191,8 @@ class FrigateReview:
 
     @property
     def external_gif_url(self) -> str:
-        """External GIF URL of the best event. Requires FRIGATE_EXTERNAL_URL."""
-        return self.best_event.external_gif_url
+        """External review GIF URL. Requires FRIGATE_EXTERNAL_URL."""
+        return urls.review_gif_url(self.review_id, external=True)
 
     def as_template_vars(self) -> dict[str, Any]:
         """Return a flat dict of all variables available in message templates.
@@ -195,6 +203,7 @@ class FrigateReview:
         return {
             "review_id": self.review_id,
             "review_type": self.review_type,
+            "trigger": self.trigger,
             "camera": self.camera,
             "severity": self.severity,
             "is_alert": self.is_alert,
@@ -218,13 +227,15 @@ class FrigateReview:
             "snapshot_url": be.snapshot_url,
             "thumbnail_url": be.thumbnail_url,
             "clip_url": be.clip_url,
-            "gif_url": be.gif_url,
+            "gif_url": urls.review_gif_url(self.review_id),
             **(
                 {
                     "external_snapshot_url": be.external_snapshot_url,
                     "external_thumbnail_url": be.external_thumbnail_url,
                     "external_clip_url": be.external_clip_url,
-                    "external_gif_url": be.external_gif_url,
+                    "external_gif_url": urls.review_gif_url(
+                        self.review_id, external=True
+                    ),
                 }
                 if get_config().frigate_external_url
                 else {}

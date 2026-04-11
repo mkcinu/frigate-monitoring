@@ -26,7 +26,7 @@ def _default_listener() -> FrigateListener:
                 "  Event ID : {event_id}\n"
             ),
         ),
-        filter=ReviewFilter(review_types=["end"]),
+        filter=ReviewFilter(triggers=["best"]),
     )
     return listener
 
@@ -75,11 +75,12 @@ def main() -> None:
     args = parser.parse_args()
 
     logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
+        level=logging.INFO,
         format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    if args.verbose:
+        logging.getLogger("frigate_monitoring").setLevel(logging.DEBUG)
 
     if args.config:
         from frigate_monitoring.loader import from_yaml

@@ -16,6 +16,7 @@ Example ``config.yaml``::
         template: "[{camera}] {severity}: {objects} ({score_pct})"
         filter:
           cameras: [front_door, back_door]
+          triggers: [start]
           alerts_only: true
 
       - type: webhook
@@ -24,6 +25,7 @@ Example ``config.yaml``::
         body:
           text: "{label} on {camera} ({score_pct})"
         filter:
+          triggers: [best]
           alerts_only: true
 
       - type: pushover
@@ -33,8 +35,8 @@ Example ``config.yaml``::
           sound: siren
           priority: 1
         filter:
+          triggers: [best]
           alerts_only: true
-          review_types: [end]
 
     record:
       path: recordings/mqtt.jsonl
@@ -163,6 +165,7 @@ def from_yaml(path: str | Path) -> FrigateListener:
     for action_raw in raw.get("actions", []):
         action, filt = _build_action(action_raw)
         listener.add_action(action, filter=filt)
+        log.info("Registered action %s with filter %s", action, filt)
 
     record = raw.get("record")
     if record:

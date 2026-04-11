@@ -82,15 +82,15 @@ class PushoverAction(Action):
     variables as :class:`~actions.print_action.PrintAction`.  Leave ``url`` or
     ``url_title`` empty to omit them from the notification.
 
-    To send different messages for ``new`` vs ``end`` reviews, register two
-    actions with appropriate ``review_types`` filters::
+    To send different messages for ``start`` vs ``best``, register two
+    actions with appropriate trigger filters::
 
         listener.add_action(
             PushoverAction(
                 token=TOKEN, user_key=USER,
                 title="Frigate: {label} spotted",
             ),
-            filter=ReviewFilter(alerts_only=True, review_types=["new"]),
+            filter=ReviewFilter(alerts_only=True, triggers=["start"]),
         )
         listener.add_action(
             PushoverAction(
@@ -101,7 +101,7 @@ class PushoverAction(Action):
                 url_title="View clip",
                 options=PushoverOptions(sound="siren", priority=1),
             ),
-            filter=ReviewFilter(alerts_only=True, review_types=["end"]),
+            filter=ReviewFilter(alerts_only=True, triggers=["best"]),
         )
 
     Parameters

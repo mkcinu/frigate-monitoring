@@ -11,32 +11,40 @@ frigate:
   # external_url: https://frigate.example.com
 
 actions:
-  # Print completed alerts to stdout
+  # Immediate notification when a review first becomes an alert
   - type: print
-    template: "[{camera}] {label} ({score_pct}) — {objects}"
+    template: "[{camera}] START: {label} ({score_pct})"
     filter:
-      review_types: [end]
+      triggers: [start]
       alerts_only: true
 
-  # Log all reviews
+  # Best-quality notification when the review ends
+  - type: print
+    template: "[{camera}] BEST: {label} ({top_score_pct}) — {objects}"
+    filter:
+      triggers: [best]
+      alerts_only: true
+
+  # Log all reviews (no triggers = fires on every MQTT message)
   - type: log
     level: INFO
 
-  # Send a webhook for alerts
+  # Webhook with best event at review end
   - type: webhook
     url: https://hooks.example.com/frigate
     method: POST
     body:
-      text: "{label} detected on {camera} ({score_pct})"
+      text: "{label} detected on {camera} ({top_score_pct})"
       camera: "{camera}"
       snapshot: "{snapshot_url}"
+      gif: "{gif_url}"
     headers:
       Authorization: "Bearer ${WEBHOOK_TOKEN}"
     filter:
+      triggers: [best]
       alerts_only: true
-      review_types: [end]
 
-  # Pushover mobile notification
+  # Pushover: immediate alert + best-quality follow-up
   # - type: pushover
   #   token: ${PUSHOVER_TOKEN}
   #   user_key: ${PUSHOVER_USER}
@@ -47,8 +55,20 @@ actions:
   #     sound: siren
   #     priority: 1
   #   filter:
+  #     triggers: [start]
   #     alerts_only: true
-  #     review_types: [end]
+
+  # - type: pushover
+  #   token: ${PUSHOVER_TOKEN}
+  #   user_key: ${PUSHOVER_USER}
+  #   title: "Frigate: {label} ended ({duration:.0f}s)"
+  #   message: "{label} ({top_score_pct})"
+  #   url: "{gif_url}"
+  #   url_title: "View clip"
+  #   attach_snapshot: true
+  #   filter:
+  #     triggers: [best]
+  #     alerts_only: true
 
 # Record MQTT messages for later replay / testing
 # record:
