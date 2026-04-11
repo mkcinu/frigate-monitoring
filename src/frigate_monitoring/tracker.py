@@ -163,6 +163,8 @@ class ReviewTracker:
             ]
 
         if not ids_to_fetch:
+            if tracked.best_event is not None:
+                review.best_event = tracked.best_event
             return
 
         new_events: list[FrigateEvent] = []
