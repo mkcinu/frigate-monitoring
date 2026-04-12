@@ -4,12 +4,25 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from typing import Any
+
+from jinja2 import Environment
 
 from frigate_monitoring.review import FrigateReview
 
 log = logging.getLogger(__name__)
 
-DEFAULT_TEMPLATE = "[{camera}] {review_type}: {objects} ({score_pct}) — {severity}"
+DEFAULT_TEMPLATE = (
+    "[{{ camera }}] {{ review_type }}: {{ objects | join(', ') }}"
+    " ({{ score_pct }}) — {{ severity }}"
+)
+
+_env = Environment()
+
+
+def render_template(template: str, context: dict[str, Any]) -> str:
+    """Render a Jinja2 template string against the given variable dict."""
+    return _env.from_string(template).render(context)
 
 
 class Action(ABC):

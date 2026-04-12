@@ -19,41 +19,41 @@ Template variable reference
 ---------------------------
 The following placeholders are available in every message template:
 
-    {review_id}             Frigate's unique review ID.
-    {review_type}           One of: new | update | end
-    {camera}                Camera name (e.g. "front_door").
-    {severity}              "alert" or "detection".
-    {is_alert}              True if severity == "alert".
-    {objects}               Comma-separated detected object types.
-    {zones}                 Comma-separated active zones.
-    {sub_labels}            Comma-separated sub-labels (face names, plates, …).
-    {start_time}            Review start as a formatted datetime string.
-    {start_ts}              Review start as a Unix timestamp (float).
-    {end_time}              Formatted review end; empty string while ongoing.
-    {end_ts}                Review end as a Unix timestamp (float, 0.0 if ongoing).
-    {duration}              Elapsed seconds since review start (float).
+    {{ review_id }}             Frigate's unique review ID.
+    {{ review_type }}           One of: new | update | end
+    {{ camera }}                Camera name (e.g. "front_door").
+    {{ severity }}              "alert" or "detection".
+    {{ is_alert }}              True if severity == "alert".
+    {{ objects }}               List of detected object types. Use ``| join(', ')`` to render as a string.
+    {{ zones }}                 List of active zones.
+    {{ sub_labels }}            List of sub-labels (face names, plates, …).
+    {{ start_time }}            Review start as a formatted datetime string.
+    {{ start_ts }}              Review start as a Unix timestamp (float).
+    {{ end_time }}              Formatted review end; empty string while ongoing.
+    {{ end_ts }}                Review end as a Unix timestamp (float, 0.0 if ongoing).
+    {{ duration }}              Elapsed seconds since review start (float).
 
 The following come from the best event (highest score) and require an HTTP
 call to the Frigate API on first access:
 
-    {event_id}              Best event ID.
-    {label}                 Detected object class (e.g. "person").
-    {sub_label}             Sub-label for the best event.
-    {score}                 Detection confidence, 0.0–1.0.
-    {score_pct}             Confidence as a percentage string, e.g. "87.3%".
-    {top_score}             Highest confidence seen during this event.
-    {top_score_pct}         Same as a percentage string.
-    {has_clip}              True if a video clip is available.
-    {has_snapshot}          True if a snapshot image is available.
-    {snapshot_url}          URL to a JPEG snapshot of the best event.
-    {thumbnail_url}         URL to a small JPEG thumbnail.
-    {clip_url}              URL to the MP4 video clip.
-    {gif_url}               Review-level animated GIF covering the full alert window.
-    {trigger}               Trigger that caused this dispatch ("start" or "best").
-    {external_snapshot_url} External snapshot URL (requires FRIGATE_EXTERNAL_URL).
-    {external_thumbnail_url} External thumbnail URL (requires FRIGATE_EXTERNAL_URL).
-    {external_clip_url}     External clip URL (requires FRIGATE_EXTERNAL_URL).
-    {external_gif_url}      External review GIF URL (requires FRIGATE_EXTERNAL_URL).
+    {{ event_id }}              Best event ID.
+    {{ label }}                 Detected object class (e.g. "person").
+    {{ sub_label }}             Sub-label for the best event.
+    {{ score }}                 Detection confidence, 0.0–1.0.
+    {{ score_pct }}             Confidence as a percentage string, e.g. "87.3%".
+    {{ top_score }}             Highest confidence seen during this event.
+    {{ top_score_pct }}         Same as a percentage string.
+    {{ has_clip }}              True if a video clip is available.
+    {{ has_snapshot }}          True if a snapshot image is available.
+    {{ snapshot_url }}          URL to a JPEG snapshot of the best event.
+    {{ thumbnail_url }}         URL to a small JPEG thumbnail.
+    {{ clip_url }}              URL to the MP4 video clip.
+    {{ gif_url }}               Review-level animated GIF covering the full alert window.
+    {{ trigger }}               Trigger that caused this dispatch ("start" or "best").
+    {{ external_snapshot_url }} External snapshot URL (requires FRIGATE_EXTERNAL_URL).
+    {{ external_thumbnail_url }} External thumbnail URL (requires FRIGATE_EXTERNAL_URL).
+    {{ external_clip_url }}     External clip URL (requires FRIGATE_EXTERNAL_URL).
+    {{ external_gif_url }}      External review GIF URL (requires FRIGATE_EXTERNAL_URL).
 """
 
 from __future__ import annotations
@@ -207,9 +207,9 @@ class FrigateReview:
             "camera": self.camera,
             "severity": self.severity,
             "is_alert": self.is_alert,
-            "objects": ", ".join(self.objects),
-            "zones": ", ".join(self.zones),
-            "sub_labels": ", ".join(self.sub_labels),
+            "objects": self.objects,
+            "zones": self.zones,
+            "sub_labels": self.sub_labels,
             "start_time": self.start_time,
             "start_ts": self.start_ts,
             "end_time": self.end_time,

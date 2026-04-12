@@ -10,9 +10,8 @@ actions:
   - type: pushover
     token: ${PUSHOVER_TOKEN}
     user_key: ${PUSHOVER_USER}
-    message: "{label} detected ({score_pct})."
-    url: "{external_gif_url}"
+    message: "{{ label }} detected ({{ score_pct }})."
+    url: "{{ external_gif_url }}"
     url_title: View GIF
     filter:
-      fd: fdsgdfgds
       triggers: [start, best]

@@ -8,7 +8,7 @@ import logging
 import attrs
 import httpx
 
-from frigate_monitoring.actions.base import Action
+from frigate_monitoring.actions.base import Action, render_template
 from frigate_monitoring.review import FrigateReview
 
 log = logging.getLogger(__name__)
@@ -45,15 +45,15 @@ class WebhookAction(Action):
     async def handle(self, review: FrigateReview) -> None:
         """Send the HTTP request."""
         template_vars = review.as_template_vars()
-        target_url = self.url.format_map(template_vars)
+        target_url = render_template(self.url, template_vars)
 
         if self.body is not None:
-            body = {k: v.format_map(template_vars) for k, v in self.body.items()}
+            body = {k: render_template(v, template_vars) for k, v in self.body.items()}
         else:
             body = {k: str(v) for k, v in template_vars.items()}
 
         rendered_headers = {
-            k: v.format_map(template_vars) for k, v in self.headers.items()
+            k: render_template(v, template_vars) for k, v in self.headers.items()
         }
         rendered_headers.setdefault("Content-Type", "application/json")
 

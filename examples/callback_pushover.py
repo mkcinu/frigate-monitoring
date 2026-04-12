@@ -25,8 +25,8 @@ def main() -> None:
         PushoverAction(
             token=os.environ["PUSHOVER_TOKEN"],
             user_key=os.environ["PUSHOVER_USER"],
-            message="{label} detected ({score_pct}). See {external_clip_url}",
-            url="{external_gif_url}",
+            message="{{ label }} detected ({{ score_pct }}). See {{ external_clip_url }}",
+            url="{{ external_gif_url }}",
             url_title="View GIF",
             options=PushoverOptions(ttl=60),
         ),

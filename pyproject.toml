@@ -7,7 +7,7 @@ name = "frigate-monitoring"
 version = "0.1.0"
 description = "Subscribe to Frigate NVR MQTT events and dispatch them to configurable action handlers"
 requires-python = ">=3.12"
-dependencies = ["paho-mqtt>=2.0", "trio>=0.27", "httpx>=0.27", "python-dotenv>=1.0", "attrs>=23.1", "cattrs>=23.1", "pyyaml>=6.0", "rich>=13.0"]
+dependencies = ["paho-mqtt>=2.0", "trio>=0.27", "httpx>=0.27", "python-dotenv>=1.0", "attrs>=23.1", "cattrs>=23.1", "pyyaml>=6.0", "rich>=13.0", "jinja2>=3.1"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0", "pytest-trio>=0.8"]

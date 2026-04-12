@@ -7,7 +7,7 @@ from typing import Any
 import attrs
 import httpx
 
-from frigate_monitoring.actions.base import Action
+from frigate_monitoring.actions.base import Action, render_template
 from frigate_monitoring.review import FrigateReview
 
 _API_URL = "https://api.pushover.net/1/messages.json"
@@ -78,7 +78,7 @@ class PushoverOptions:
 class PushoverAction(Action):
     """Send a Pushover push notification for each matching review.
 
-    All string fields are Python format strings and support the same template
+    All string fields are Jinja2 templates and support the same template
     variables as :class:`~actions.print_action.PrintAction`.  Leave ``url`` or
     ``url_title`` empty to omit them from the notification.
 
@@ -88,7 +88,7 @@ class PushoverAction(Action):
         listener.add_action(
             PushoverAction(
                 token=TOKEN, user_key=USER,
-                title="Frigate: {label} spotted",
+                title="Frigate: {{ label }} spotted",
             ),
             filter=ReviewFilter(alerts_only=True, triggers=["start"]),
         )
@@ -96,8 +96,8 @@ class PushoverAction(Action):
             PushoverAction(
                 token=TOKEN,
                 user_key=USER,
-                title="Frigate: {label} ended ({duration:.0f}s)",
-                url="{external_gif_url}",
+                title="Frigate: {{ label }} ended ({{ duration | round | int }}s)",
+                url="{{ external_gif_url }}",
                 url_title="View clip",
                 options=PushoverOptions(sound="siren", priority=1),
             ),
@@ -126,8 +126,8 @@ class PushoverAction(Action):
 
     token: str
     user_key: str
-    title: str = "Frigate: {label} on {camera}"
-    message: str = "{label} detected ({score_pct})"
+    title: str = "Frigate: {{ label }} on {{ camera }}"
+    message: str = "{{ label }} detected ({{ score_pct }})"
     url: str = ""
     url_title: str = ""
     attach_snapshot: bool = True
@@ -137,14 +137,14 @@ class PushoverAction(Action):
         """Send the Pushover notification."""
         tpl_vars = review.as_template_vars()
         data: dict[str, Any] = {
-            "title": self.title.format_map(tpl_vars),
-            "message": self.message.format_map(tpl_vars),
+            "title": render_template(self.title, tpl_vars),
+            "message": render_template(self.message, tpl_vars),
             **self.options.as_api_params(),
         }
         if self.url:
-            data["url"] = self.url.format_map(tpl_vars)
+            data["url"] = render_template(self.url, tpl_vars)
         if self.url_title:
-            data["url_title"] = self.url_title.format_map(tpl_vars)
+            data["url_title"] = render_template(self.url_title, tpl_vars)
 
         files: dict[str, Any] = {}
         async with httpx.AsyncClient() as client:

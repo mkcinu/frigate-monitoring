@@ -13,7 +13,7 @@ Example ``config.yaml``::
 
     actions:
       - type: print
-        template: "[{camera}] {severity}: {objects} ({score_pct})"
+        template: "[{{ camera }}] {{ severity }}: {{ objects | join(', ') }} ({{ score_pct }})"
         filter:
           cameras: [front_door, back_door]
           triggers: [start]
@@ -23,7 +23,7 @@ Example ``config.yaml``::
         url: https://hooks.example.com/alert
         method: POST
         body:
-          text: "{label} on {camera} ({score_pct})"
+          text: "{{ label }} on {{ camera }} ({{ score_pct }})"
         filter:
           triggers: [best]
           alerts_only: true

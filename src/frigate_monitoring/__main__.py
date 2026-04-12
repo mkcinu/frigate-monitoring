@@ -18,12 +18,12 @@ def _default_listener() -> FrigateListener:
     listener.add_action(
         PrintAction(
             template=(
-                "[{camera}] *** {review_type}: {severity}"
-                " — {objects} ({score_pct}) ***\n"
-                "  Snapshot : {snapshot_url}\n"
-                "  GIF      : {gif_url}\n"
-                "  Clip     : {clip_url}\n"
-                "  Event ID : {event_id}\n"
+                "[{{ camera }}] *** {{ review_type }}: {{ severity }}"
+                " — {{ objects | join(', ') }} ({{ score_pct }}) ***\n"
+                "  Snapshot : {{ snapshot_url }}\n"
+                "  GIF      : {{ gif_url }}\n"
+                "  Clip     : {{ clip_url }}\n"
+                "  Event ID : {{ event_id }}\n"
             ),
         ),
         filter=ReviewFilter(triggers=["best"]),

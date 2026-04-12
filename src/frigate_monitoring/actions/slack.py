@@ -7,7 +7,7 @@ from typing import Any
 import attrs
 import httpx
 
-from frigate_monitoring.actions.base import Action
+from frigate_monitoring.actions.base import Action, render_template
 from frigate_monitoring.review import FrigateReview
 
 _CHAT_POST_URL = "https://slack.com/api/chat.postMessage"
@@ -45,17 +45,17 @@ class SlackAction(Action):
           - type: slack
             bot_token: ${SLACK_BOT_TOKEN}
             channel: ${SLACK_CHANNEL}   # must be a channel ID, e.g. C0123456789
-            title: "Frigate: {label} spotted"
-            message: "{label} on *{camera}* ({score_pct})"
+            title: "Frigate: {{ label }} spotted"
+            message: "{{ label }} on *{{ camera }}* ({{ score_pct }})"
             attach_gif: true
             filter:
               alerts_only: true
               triggers: [best]
 
-    All string fields are Python :meth:`str.format_map` templates and support
-    the same variables as :class:`~actions.print_action.PrintAction`.  The
-    ``message`` field supports Slack *mrkdwn* formatting (``*bold*``,
-    ``_italic_``, ``<url|text>`` links, etc.).
+    All string fields are Jinja2 templates and support the same variables as
+    :class:`~actions.print_action.PrintAction`.  The ``message`` field supports
+    Slack *mrkdwn* formatting (``*bold*``, ``_italic_``, ``<url|text>`` links,
+    etc.).
 
     When ``attach_snapshot`` and/or ``attach_gif`` are ``True``, the
     corresponding files are fetched and uploaded via the Slack Files API
@@ -91,8 +91,8 @@ class SlackAction(Action):
 
     bot_token: str
     channel: str
-    title: str = "Frigate: {label} on {camera}"
-    message: str = "{label} detected ({score_pct})"
+    title: str = "Frigate: {{ label }} on {{ camera }}"
+    message: str = "{{ label }} detected ({{ score_pct }})"
     attach_snapshot: bool = True
     attach_gif: bool = False
     username: str = ""
@@ -101,8 +101,8 @@ class SlackAction(Action):
     async def handle(self, review: FrigateReview) -> None:
         """Send the Slack notification."""
         tpl_vars = review.as_template_vars()
-        title_text = self.title.format_map(tpl_vars)
-        message_text = self.message.format_map(tpl_vars)
+        title_text = render_template(self.title, tpl_vars)
+        message_text = render_template(self.message, tpl_vars)
 
         headers = {"Authorization": f"Bearer {self.bot_token}"}
 

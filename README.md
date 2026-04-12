@@ -31,7 +31,7 @@ from frigate_monitoring.listener import FrigateListener
 
 listener = FrigateListener()
 listener.add_action(
-    PrintAction(template="[{camera}] {label} ({score_pct})"),
+    PrintAction(template="[{{ camera }}] {{ label }} ({{ score_pct }})"),
     filter=ReviewFilter(alerts_only=True, triggers=["best"]),
 )
 listener.run()
@@ -56,7 +56,7 @@ frigate:
 
 actions:
   - type: print
-    template: "[{camera}] {severity}: {objects} ({score_pct})"
+    template: "[{{ camera }}] {{ severity }}: {{ objects | join(', ') }} ({{ score_pct }})"
     filter:
       cameras: [front_door, back_door]
       alerts_only: true
@@ -65,8 +65,8 @@ actions:
     url: https://hooks.example.com/frigate
     method: POST
     body:
-      text: "{label} detected on {camera} ({score_pct})"
-      camera: "{camera}"
+      text: "{{ label }} detected on {{ camera }} ({{ score_pct }})"
+      camera: "{{ camera }}"
     headers:
       Authorization: "Bearer ${WEBHOOK_TOKEN}"
     filter:
@@ -86,7 +86,7 @@ actions:
   - type: slack
     bot_token: ${SLACK_BOT_TOKEN}
     channel: ${SLACK_CHANNEL}   # must be a channel ID, e.g. C0123456789
-    message: "*{label}* ({score_pct}) on *{camera}* | zones: {zones}"
+    message: "*{{ label }}* ({{ score_pct }}) on *{{ camera }}* | zones: {{ zones | join(', ') }}"
     attach_gif: true
     filter:
       alerts_only: true

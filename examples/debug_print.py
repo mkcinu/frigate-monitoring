@@ -20,7 +20,11 @@ def main() -> None:
     """Run the listener and print review summaries and raw payloads."""
     init(Config.from_env())
     listener = FrigateListener()
-    listener.add_action(PrintAction("[{camera}] {review_type}: {objects} — {severity}"))
+    listener.add_action(
+        PrintAction(
+            "[{{ camera }}] {{ review_type }}: {{ objects | join(', ') }} — {{ severity }}"
+        )
+    )
     listener.add_action(CallbackAction(print_raw))
     trio.run(listener.run)
 

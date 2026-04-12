@@ -13,10 +13,10 @@ actions:
   - type: slack
     bot_token: ${SLACK_BOT_TOKEN}
     channel: ${SLACK_CHANNEL}  # must be a channel ID, e.g. C0123456789
-    title: ":rotating_light: {label} on {camera}"
+    title: ":rotating_light: {{ label }} on {{ camera }}"
     message: |
-      :eye: *{label}* ({score_pct}) on *{camera}* at {start_time}  |  :round_pushpin: {zones}
-      :frame_with_picture: <{external_snapshot_url}|Snapshot>  ·  :film_frames: <{external_gif_url}|GIF>
+      :eye: *{{ label }}* ({{ score_pct }}) on *{{ camera }}* at {{ start_time }}  |  :round_pushpin: {{ zones | join(', ') }}
+      :frame_with_picture: <{{ external_snapshot_url }}|Snapshot>  ·  :film_frames: <{{ external_gif_url }}|GIF>
     attach_gif: true
     attach_snapshot: false
     filter:
@@ -27,10 +27,10 @@ actions:
   - type: slack
     bot_token: ${SLACK_BOT_TOKEN}
     channel: ${SLACK_CHANNEL}
-    title: ":checkered_flag: {label} on {camera} — {duration:.0f}s"
+    title: ":checkered_flag: {{ label }} on {{ camera }} — {{ duration | round | int }}s"
     message: |
-      :bust_in_silhouette: *{label}* ({sub_label})  |  :dart: {score_pct} (top {top_score_pct})  |  :timer_clock: {duration:.0f}s  |  :round_pushpin: {zones}
-      :frame_with_picture: <{external_snapshot_url}|Snapshot>  ·  :clapper: <{external_clip_url}|Clip>  ·  :film_frames: <{external_gif_url}|GIF>
+      :bust_in_silhouette: *{{ label }}* ({{ sub_label }})  |  :dart: {{ score_pct }} (top {{ top_score_pct }})  |  :timer_clock: {{ duration | round | int }}s  |  :round_pushpin: {{ zones | join(', ') }}
+      :frame_with_picture: <{{ external_snapshot_url }}|Snapshot>  ·  :clapper: <{{ external_clip_url }}|Clip>  ·  :film_frames: <{{ external_gif_url }}|GIF>
     attach_gif: true
     attach_snapshot: false
     filter:

@@ -11,7 +11,7 @@ actions:
     body:
       topic: "${NTFY_TOPIC}"
       title: "Frigate alert"
-      message: "{camera}: {label} ({score_pct})"
+      message: "{{ camera }}: {{ label }} ({{ score_pct }})"
     filter:
       alerts_only: true
       triggers: [best]

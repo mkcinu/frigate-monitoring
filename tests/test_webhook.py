@@ -37,7 +37,7 @@ async def test_sends_post_with_template_vars(fake_event: FrigateEvent) -> None:
 
         action = WebhookAction(
             url="https://example.com/hook",
-            body={"text": "{label} on {camera}", "cam": "{camera}"},
+            body={"text": "{{ label }} on {{ camera }}", "cam": "{{ camera }}"},
         )
         await action.handle(_review_with_event(fake_event))
 
@@ -57,7 +57,7 @@ async def test_url_template_expansion(fake_event: FrigateEvent) -> None:
         MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        action = WebhookAction(url="https://example.com/{camera}/alert")
+        action = WebhookAction(url="https://example.com/{{ camera }}/alert")
         await action.handle(_review_with_event(fake_event))
 
     assert (

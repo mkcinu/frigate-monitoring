@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import ClassVar
 
 import attrs
+from jinja2 import TemplateError
 
-from frigate_monitoring.actions.base import DEFAULT_TEMPLATE, Action
+from frigate_monitoring.actions.base import DEFAULT_TEMPLATE, Action, render_template
 from frigate_monitoring.review import FrigateReview
 
 
@@ -17,9 +18,9 @@ class PrintAction(Action):
     Parameters
     ----------
     template:
-        A Python format string using the variables listed in
+        A Jinja2 template string using the variables listed in
         :mod:`review` module docstring.
-        Example: ``"[{camera}] {severity}: {objects} — {score_pct}"``
+        Example: ``"[{{ camera }}] {{ severity }}: {{ objects | join(', ') }} — {{ score_pct }}"``
     """
 
     DEFAULT_TEMPLATE: ClassVar[str] = DEFAULT_TEMPLATE
@@ -29,7 +30,7 @@ class PrintAction(Action):
     async def handle(self, review: FrigateReview) -> None:
         """Print the rendered template to stdout."""
         try:
-            msg = self.template.format_map(review.as_template_vars())
-        except KeyError as exc:
-            msg = f"[template error: unknown variable {exc}] raw: {review}"
+            msg = render_template(self.template, review.as_template_vars())
+        except TemplateError as exc:
+            msg = f"[template error: {exc}] raw: {review}"
         print(msg)

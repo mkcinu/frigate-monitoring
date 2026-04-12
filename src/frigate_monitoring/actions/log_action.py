@@ -6,7 +6,7 @@ import logging
 
 import attrs
 
-from frigate_monitoring.actions.base import DEFAULT_TEMPLATE, Action
+from frigate_monitoring.actions.base import DEFAULT_TEMPLATE, Action, render_template
 from frigate_monitoring.review import FrigateReview
 
 
@@ -37,5 +37,5 @@ class LogAction(Action):
     async def handle(self, review: FrigateReview) -> None:
         """Emit the rendered template as a log record."""
         log = logging.getLogger(__name__)
-        msg = self.template.format_map(review.as_template_vars())
+        msg = render_template(self.template, review.as_template_vars())
         log.log(self.level, msg)  # type: ignore[arg-type]
