@@ -49,6 +49,12 @@ class FrigateEvent:
         return urls.snapshot_url(self.event_id)
 
     @property
+    def snapshot_url_cropped(self) -> str:
+        """URL to a cropped JPEG snapshot of the detected object. This only works during ongoing event!
+        Later, snapshots are stored as configured in the Frigate settings"""
+        return urls.snapshot_url(self.event_id, bbox=True, cropped=True)
+
+    @property
     def thumbnail_url(self) -> str:
         """URL to a small JPEG thumbnail."""
         return urls.thumbnail_url(self.event_id)

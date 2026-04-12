@@ -42,6 +42,10 @@ class ReviewFilter:
     cameras: list[str] | None = None
     """Restrict to these camera names.  ``None`` matches any camera."""
 
+    labels: list[str] | None = None
+    """Restrict to reviews whose best-event label is one of these values
+    (e.g. ``["person", "car"]``).  ``None`` matches any label."""
+
     objects: list[str] | None = None
     """Restrict to reviews containing at least one of these object types."""
 
@@ -76,6 +80,12 @@ class ReviewFilter:
         """
         if self.cameras and review.camera not in self.cameras:
             return False
+        if self.labels:
+            try:
+                if review.best_event.label not in self.labels:
+                    return False
+            except RuntimeError:
+                return False
         if self.objects and not set(review.objects).intersection(self.objects):
             return False
         if self.triggers is not None:

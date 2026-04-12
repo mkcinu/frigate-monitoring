@@ -160,6 +160,12 @@ class FrigateReview:
         return self.best_event.snapshot_url
 
     @property
+    def snapshot_url_cropped(self) -> str:
+        """Cropped JPEG snapshot URL of the best event. This only works during ongoing event!
+        Later, snapshots are stored as configured in the Frigate settings"""
+        return self.best_event.snapshot_url_cropped
+
+    @property
     def thumbnail_url(self) -> str:
         """Thumbnail URL of the best event."""
         return self.best_event.thumbnail_url
@@ -225,6 +231,7 @@ class FrigateReview:
             "has_clip": be.has_clip,
             "has_snapshot": be.has_snapshot,
             "snapshot_url": be.snapshot_url,
+            "snapshot_url_cropped": be.snapshot_url_cropped,
             "thumbnail_url": be.thumbnail_url,
             "clip_url": be.clip_url,
             "gif_url": urls.review_gif_url(self.review_id),

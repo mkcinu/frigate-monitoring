@@ -15,9 +15,13 @@ def _base(external: bool) -> str:
     return cfg.frigate_base_url
 
 
-def snapshot_url(event_id: str, *, bbox: bool = False, external: bool = False) -> str:
+def snapshot_url(
+    event_id: str, *, bbox: bool = False, external: bool = False, cropped: bool = False
+) -> str:
     """JPEG still of the detected object.  Pass ``bbox=True`` to draw a bounding box."""
     qs = "?bbox=1" if bbox else ""
+    if cropped:
+        qs += ("&" if qs else "") + "crop=1"
     return f"{_base(external)}/api/events/{event_id}/snapshot.jpg{qs}"
 
 

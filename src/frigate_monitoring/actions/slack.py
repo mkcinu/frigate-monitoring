@@ -197,10 +197,15 @@ class SlackAction(Action):
         file_entries: list[dict[str, str]] = []
 
         if self.attach_snapshot:
-            resp = await client.get(review.snapshot_url, timeout=15.0)
+            resp = await client.get(review.snapshot_url_cropped, timeout=15.0)
             resp.raise_for_status()
             fid = await self._upload_file(
-                client, headers, resp.content, "snapshot.jpg", "image/jpeg", title
+                client,
+                headers,
+                resp.content,
+                "snapshot_cropped.jpg",
+                "image/jpeg",
+                title,
             )
             file_entries.append({"id": fid, "title": title})
 
