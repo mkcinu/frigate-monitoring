@@ -11,6 +11,7 @@ import trio
 
 from frigate_monitoring.actions.base import Action
 from frigate_monitoring.config import Config, get_config
+from frigate_monitoring.enabled import POLL_INTERVAL_SECONDS, EnabledCheck
 from frigate_monitoring.filter import ReviewFilter
 from frigate_monitoring.recorder import MqttRecorder
 from frigate_monitoring.review import FrigateReview
@@ -56,7 +57,7 @@ class FrigateListener:
         self.mqtt_user = cfg.mqtt_user
         self.mqtt_password = cfg.mqtt_password
         self.topic = cfg.mqtt_topic
-        self._actions: list[tuple[Action, ReviewFilter]] = []
+        self._actions: list[tuple[Action, ReviewFilter, EnabledCheck]] = []
         self._recorders: list[MqttRecorder] = []
         self._reconnect_delay = _RECONNECT_MIN_DELAY
         self._tracker = ReviewTracker()
@@ -69,10 +70,13 @@ class FrigateListener:
         self._client.on_disconnect = self._on_disconnect
 
     def add_action(  # pylint: disable=redefined-builtin
-        self, action: Action, filter: ReviewFilter | None = None
+        self,
+        action: Action,
+        filter: ReviewFilter | None = None,
+        enabled: EnabledCheck = True,
     ) -> "FrigateListener":
         """Register an action handler.  Returns ``self`` to allow method chaining."""
-        self._actions.append((action, filter or ReviewFilter()))
+        self._actions.append((action, filter or ReviewFilter(), enabled))
         return self
 
     def add_recorder(self, recorder: MqttRecorder) -> "FrigateListener":
@@ -107,6 +111,7 @@ class FrigateListener:
         try:
             async with trio.open_nursery() as nursery:
                 nursery.start_soon(self._mqtt_loop_task, send_chan)
+                nursery.start_soon(self._poll_enabled_checks)
                 async with recv_chan:
                     async for msg in recv_chan:
                         nursery.start_soon(self._handle_raw_message, msg)
@@ -138,6 +143,23 @@ class FrigateListener:
                 self._reconnect_delay = min(
                     self._reconnect_delay * 2, _RECONNECT_MAX_DELAY
                 )
+
+    async def _poll_enabled_checks(self) -> None:
+        """Periodically refresh dynamic enabled checks (HTTP, command)."""
+        dynamic = [ec for _, _, ec in self._actions if not isinstance(ec, bool)]
+        if not dynamic:
+            return
+        while True:
+            for check in dynamic:
+                try:
+                    await check.refresh()
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    log.warning(
+                        "Enabled check refresh failed for %s: %s",
+                        type(check).__name__,
+                        exc,
+                    )
+            await trio.sleep(POLL_INTERVAL_SECONDS)
 
     async def _mqtt_loop_task(
         self, send_chan: trio.MemorySendChannel[mqtt.MQTTMessage]
@@ -194,7 +216,9 @@ class FrigateListener:
         is_end = review.review_type == "end"
 
         async with trio.open_nursery() as nursery:
-            for action_idx, (action, filt) in enumerate(self._actions):
+            for action_idx, (action, filt, enabled) in enumerate(self._actions):
+                if not enabled:
+                    continue
                 if filt.triggers is not None:
                     if filt.matches(review, trigger="start"):
                         if self._tracker.should_fire_start(

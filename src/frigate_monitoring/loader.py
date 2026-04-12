@@ -57,6 +57,7 @@ import yaml
 
 from frigate_monitoring.actions.base import Action
 from frigate_monitoring.config import Config, init, load_dotenv
+from frigate_monitoring.enabled import EnabledCheck, structure_enabled
 from frigate_monitoring.filter import ReviewFilter
 from frigate_monitoring.listener import FrigateListener
 
@@ -114,14 +115,16 @@ def _resolve_action_class(name: str) -> type[Action]:
     return cast(type[Action], getattr(module, class_name))
 
 
-def _build_action(raw: dict[str, Any]) -> tuple[Action, ReviewFilter]:
+def _build_action(raw: dict[str, Any]) -> tuple[Action, ReviewFilter, EnabledCheck]:
     raw = dict(raw)
     action_type = raw.pop("type")
     filter_raw = raw.pop("filter", None)
+    enabled_raw = raw.pop("enabled", True)
     filt = _converter.structure(filter_raw or {}, ReviewFilter)
     cls = _resolve_action_class(action_type)
     action = _converter.structure(raw, cls)
-    return action, filt
+    enabled = structure_enabled(enabled_raw)
+    return action, filt, enabled
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
@@ -164,8 +167,8 @@ def from_yaml(path: str | Path) -> FrigateListener:
     listener = FrigateListener(cfg)
 
     for action_raw in raw.get("actions", []):
-        action, filt = _build_action(action_raw)
-        listener.add_action(action, filter=filt)
+        action, filt, enabled = _build_action(action_raw)
+        listener.add_action(action, filter=filt, enabled=enabled)
         log.info("Registered action %s with filter %s", action, filt)
 
     record = raw.get("record")

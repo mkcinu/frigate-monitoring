@@ -31,7 +31,7 @@ actions:
     assert listener.mqtt_host == "10.0.0.1"
     assert listener.mqtt_port == 1884
     assert len(listener._actions) == 1
-    action, filt = listener._actions[0]
+    action, filt, _ = listener._actions[0]
     assert isinstance(action, PrintAction)
     assert action.template == "[{camera}] {objects}"
     assert filt.cameras == ["front_door"]
@@ -53,7 +53,7 @@ actions:
       triggers: [best]
 """)
     listener = from_yaml(config_file)
-    action, filt = listener._actions[0]
+    action, filt, _ = listener._actions[0]
     assert isinstance(action, WebhookAction)
     assert action.method == "PUT"
     assert action.body == {"msg": "{label} on {camera}"}
@@ -72,7 +72,7 @@ actions:
 """)
     with patch.dict(os.environ, {"TEST_SECRET_TOKEN": "s3cret"}):
         listener = from_yaml(config_file)
-    action, _ = listener._actions[0]
+    action, _, _ = listener._actions[0]
     assert isinstance(action, WebhookAction)
     assert action.headers["Authorization"] == "Bearer s3cret"
 
@@ -102,7 +102,7 @@ actions:
     template: "[{camera}] {label}"
 """)
     listener = from_yaml(config_file)
-    action, _ = listener._actions[0]
+    action, _, _ = listener._actions[0]
     assert isinstance(action, LogAction)
     assert action.level == 20
 
@@ -116,7 +116,7 @@ actions:
       time_range: ["22:00", "06:00"]
 """)
     listener = from_yaml(config_file)
-    _, filt = listener._actions[0]
+    _, filt, _ = listener._actions[0]
     assert filt.time_range == (time(22, 0), time(6, 0))
 
 

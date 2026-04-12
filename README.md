@@ -37,8 +37,11 @@ listener.add_action(
 listener.run()
 ```
 
-`add_action` accepts an optional `filter` keyword argument — a `ReviewFilter` that
-controls which reviews are forwarded to that action.  Omit it to receive everything.
+`add_action` accepts optional `filter` and `enabled` keyword arguments.
+`filter` is a `ReviewFilter` that controls which reviews are forwarded to the
+action. `enabled` can be `True`/`False` or a dynamic check (see
+[Enabled checks](#enabled-checks) below). Both default to match-everything /
+enabled.
 
 ### YAML configuration
 
@@ -147,6 +150,60 @@ filter:
   zones: [driveway]
   triggers: [start, best]
 ```
+
+### Enabled checks
+
+Each action supports an optional `enabled` field that controls whether the
+action runs. It can be a simple boolean, an HTTP check, or a shell command:
+
+```yaml
+actions:
+  # Always disabled
+  - type: print
+    enabled: false
+
+  # Enabled based on a Home Assistant input_boolean
+  - type: pushover
+    token: ${PUSHOVER_TOKEN}
+    user_key: ${PUSHOVER_USER}
+    enabled:
+      url: http://homeassistant:8123/api/states/input_boolean.alerts
+      headers:
+        Authorization: "Bearer ${HA_TOKEN}"
+      expr: "{{ state }}"
+    filter:
+      alerts_only: true
+      triggers: [best]
+
+  # Enabled when a shell command exits with status 0
+  - type: webhook
+    url: https://hooks.example.com/alert
+    enabled:
+      command: "test -f /tmp/alerts-armed"
+```
+
+**HTTP check** fields:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `url` | _(required)_ | URL to GET |
+| `headers` | `{}` | Extra HTTP headers (e.g. bearer token) |
+| `expr` | _(none)_ | Jinja2 expression applied to the JSON response body; result is compared against truthy strings (`1`, `true`, `yes`, `on`). When omitted the raw response body is evaluated for truthiness. |
+| `timeout` | `10.0` | Request timeout in seconds |
+
+**Command check** fields:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `command` | _(required)_ | Shell command to run |
+| `timeout` | `10.0` | Command timeout in seconds |
+
+The command check is based on exit status: **0 means enabled**, non-zero means
+disabled.
+
+Dynamic checks (HTTP and command) are polled periodically in the background
+(every 60 seconds) — they are not re-evaluated on every event. When omitted,
+`enabled` defaults to `true`.
 
 ## Configuration
 
