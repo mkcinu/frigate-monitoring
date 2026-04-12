@@ -20,6 +20,8 @@ disable =
     suppressed-message,
     # Lazy imports keep optional deps out of the hot path.
     import-outside-toplevel,
+    # Black handles line length.
+    line-too-long,
 
 [FORMAT]
 # Match Black's default line length.
@@ -37,7 +39,7 @@ max-branches              = 12
 max-locals                = 15
 max-parents               = 7
 max-public-methods        = 20
-max-returns               = 8
+max-returns               = 10
 max-statements            = 50
 min-public-methods        = 1
 

@@ -61,6 +61,7 @@ class _LogCapture(logging.Handler):
         self._lines.append(line)
 
     def recent(self, n: int) -> list[Text]:
+        """Return the last *n* log lines."""
         return list(self._lines)[-n:]
 
 
@@ -183,7 +184,7 @@ class RichAction(Action):
             body.append(f"  {be.score_pct}", style="dim" if ended else "green")
             if abs(be.top_score - be.score) > 0.005:
                 body.append(f" · top {be.top_score_pct}", style="dim")
-        except Exception:
+        except RuntimeError:
             body.append("📦 …", style="dim")
 
         zones_str = ", ".join(review.zones) if review.zones else "—"
@@ -206,7 +207,7 @@ class RichAction(Action):
                 body.append("🎬  ", style="dim")
                 body.append(be.clip_url, style="dim")
                 body.append("\n")
-        except Exception:
+        except RuntimeError:
             pass
 
         border_style = "dim" if ended else ("red" if is_alert else "yellow")

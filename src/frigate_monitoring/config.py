@@ -11,12 +11,15 @@ The active config is stored once with :func:`init` and retrieved anywhere via
 from __future__ import annotations
 
 import os
+from typing import ClassVar
 
 import attrs
 
 
 @attrs.define
 class Config:
+    """MQTT and Frigate connection settings."""
+
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
     mqtt_user: str | None = None
@@ -28,6 +31,8 @@ class Config:
     frigate_external_url: str | None = None
 
     datetime_format: str = "%Y-%m-%d %H:%M:%S"
+
+    instance: ClassVar[Config | None] = None
 
     @classmethod
     def from_env(cls, *, use_dotenv: bool = True) -> Config:
@@ -51,23 +56,20 @@ class Config:
 
     @property
     def frigate_base_url(self) -> str:
+        """Unauthenticated HTTP base URL for the Frigate API."""
         return f"http://{self.frigate_host}:{self.frigate_port}"
-
-
-_active: Config | None = None
 
 
 def init(config: Config) -> None:
     """Set the active config.  Call once at startup."""
-    global _active  # noqa: PLW0603
-    _active = config
+    Config.instance = config
 
 
 def get_config() -> Config:
     """Return the active config, or a default if :func:`init` was never called."""
-    if _active is None:
+    if Config.instance is None:
         return Config()
-    return _active
+    return Config.instance
 
 
 def load_dotenv() -> None:

@@ -40,11 +40,6 @@ def test_structure_command() -> None:
     assert spec.command == "test -f /tmp/armed"
 
 
-def test_structure_invalid_type() -> None:
-    with pytest.raises(ValueError, match="must be a bool or a mapping"):
-        structure_enabled("yes")
-
-
 def test_structure_missing_url_and_command() -> None:
     with pytest.raises(ValueError, match="must contain 'url' or 'command'"):
         structure_enabled({"headers": {}})

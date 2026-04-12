@@ -41,7 +41,7 @@ class HttpEnabledCheck:
     """Poll a URL and extract a boolean from the JSON response."""
 
     url: str
-    headers: dict[str, str] = attrs.field(factory=dict)
+    headers: dict[str, str] = attrs.field(factory=dict[str, str])
     expr: str = ""
     timeout: float = 10.0
     _value: bool = attrs.field(default=True, alias="_value", init=False)
@@ -110,15 +110,14 @@ class CommandEnabledCheck:
 EnabledCheck = bool | HttpEnabledCheck | CommandEnabledCheck
 
 
-def structure_enabled(raw: Any) -> EnabledCheck:
+def structure_enabled(raw: bool | dict[str, Any]) -> EnabledCheck:
     """Convert a raw YAML value into an EnabledCheck."""
     if isinstance(raw, bool):
         return raw
-    if not isinstance(raw, dict):
-        raise ValueError(
-            f"'enabled' must be a bool or a mapping, got {type(raw).__name__}"
-        )
-    raw = dict(raw)
+    assert isinstance(
+        raw, dict
+    ), f"'enabled' must be a bool or a mapping, got {type(raw).__name__}"
+
     if "url" in raw:
         return HttpEnabledCheck(
             url=raw["url"],

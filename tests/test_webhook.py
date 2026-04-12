@@ -31,9 +31,11 @@ def _make_mock_client(status_code: int = 200) -> tuple[AsyncMock, MagicMock]:
 @pytest.mark.trio
 async def test_sends_post_with_template_vars(fake_event: FrigateEvent) -> None:
     mock_client, _ = _make_mock_client()
-    with patch("frigate_monitoring.actions.webhook.httpx.AsyncClient") as MockClient:
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch(
+        "frigate_monitoring.actions.webhook.httpx.AsyncClient"
+    ) as mock_client_cls:
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         action = WebhookAction(
             url="https://example.com/hook",
@@ -53,9 +55,11 @@ async def test_sends_post_with_template_vars(fake_event: FrigateEvent) -> None:
 @pytest.mark.trio
 async def test_url_template_expansion(fake_event: FrigateEvent) -> None:
     mock_client, _ = _make_mock_client()
-    with patch("frigate_monitoring.actions.webhook.httpx.AsyncClient") as MockClient:
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch(
+        "frigate_monitoring.actions.webhook.httpx.AsyncClient"
+    ) as mock_client_cls:
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         action = WebhookAction(url="https://example.com/{{ camera }}/alert")
         await action.handle(_review_with_event(fake_event))
@@ -69,9 +73,11 @@ async def test_url_template_expansion(fake_event: FrigateEvent) -> None:
 @pytest.mark.trio
 async def test_custom_method_and_headers(fake_event: FrigateEvent) -> None:
     mock_client, _ = _make_mock_client()
-    with patch("frigate_monitoring.actions.webhook.httpx.AsyncClient") as MockClient:
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch(
+        "frigate_monitoring.actions.webhook.httpx.AsyncClient"
+    ) as mock_client_cls:
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         action = WebhookAction(
             url="https://example.com/hook",
@@ -90,9 +96,11 @@ async def test_custom_method_and_headers(fake_event: FrigateEvent) -> None:
 @pytest.mark.trio
 async def test_default_body_sends_all_vars(fake_event: FrigateEvent) -> None:
     mock_client, _ = _make_mock_client()
-    with patch("frigate_monitoring.actions.webhook.httpx.AsyncClient") as MockClient:
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch(
+        "frigate_monitoring.actions.webhook.httpx.AsyncClient"
+    ) as mock_client_cls:
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         action = WebhookAction(url="https://example.com/hook")
         await action.handle(_review_with_event(fake_event))
