@@ -13,8 +13,7 @@ from frigate_monitoring.review import FrigateReview
 log = logging.getLogger(__name__)
 
 DEFAULT_TEMPLATE = (
-    "[{{ camera }}] {{ review_type }}: {{ objects | join(', ') }}"
-    " ({{ score_pct }}) — {{ severity }}"
+    "[{{ camera }}] {{ review_type }}: {{ objects | join(', ') }} — {{ severity }}"
 )
 
 _env = Environment()

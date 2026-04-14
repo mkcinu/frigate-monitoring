@@ -78,31 +78,9 @@ class PushoverOptions:
 class PushoverAction(Action):
     """Send a Pushover push notification for each matching review.
 
-    All string fields are Jinja2 templates and support the same template
-    variables as :class:`~actions.print_action.PrintAction`.  Leave ``url`` or
-    ``url_title`` empty to omit them from the notification.
-
-    To send different messages for ``start`` vs ``best``, register two
-    actions with appropriate trigger filters::
-
-        listener.add_action(
-            PushoverAction(
-                token=TOKEN, user_key=USER,
-                title="Frigate: {{ label }} spotted",
-            ),
-            filter=ReviewFilter(alerts_only=True, triggers=["start"]),
-        )
-        listener.add_action(
-            PushoverAction(
-                token=TOKEN,
-                user_key=USER,
-                title="Frigate: {{ label }} ended ({{ duration | round | int }}s)",
-                url="{{ external_gif_url }}",
-                url_title="View clip",
-                options=PushoverOptions(sound="siren", priority=1),
-            ),
-            filter=ReviewFilter(alerts_only=True, triggers=["best"]),
-        )
+    All string fields are Jinja2 templates.  The ``events`` list is available
+    in templates — each entry is a dict with ``label``, ``score_pct``, etc.
+    Leave ``url`` or ``url_title`` empty to omit them from the notification.
 
     Parameters
     ----------
@@ -119,15 +97,15 @@ class PushoverAction(Action):
     url_title:
         Label for the URL.
     attach_snapshot:
-        When ``True``, fetch and attach the best-event snapshot image.
+        When ``True``, attach the snapshot of the first event that has one.
     options:
         Fine-grained delivery options (sound, priority, TTL, …).
     """
 
     token: str
     user_key: str
-    title: str = "Frigate: {{ label }} on {{ camera }}"
-    message: str = "{{ label }} detected ({{ score_pct }})"
+    title: str = "Frigate alert on {{ camera }}"
+    message: str = "{{ events | map(attribute='label') | join(', ') }} detected"
     url: str = ""
     url_title: str = ""
     attach_snapshot: bool = True
@@ -147,12 +125,15 @@ class PushoverAction(Action):
             data["url_title"] = render_template(self.url_title, tpl_vars)
 
         files: dict[str, Any] = {}
-        async with httpx.AsyncClient() as client:
-            if self.attach_snapshot:
-                snapshot = await client.get(review.snapshot_url, timeout=15.0)
-                snapshot.raise_for_status()
-                files["attachment"] = ("snapshot.jpg", snapshot.content, "image/jpeg")
+        if self.attach_snapshot:
+            snap = next(
+                (ev.snapshot_bytes for ev in review.events if ev.snapshot_bytes),
+                None,
+            )
+            if snap is not None:
+                files["attachment"] = ("snapshot.jpg", snap, "image/jpeg")
 
+        async with httpx.AsyncClient() as client:
             resp = await client.post(
                 _API_URL,
                 data={"token": self.token, "user": self.user_key, **data},

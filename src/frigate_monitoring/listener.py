@@ -6,12 +6,14 @@ import json
 import logging
 from typing import Any
 
+import attrs
 import paho.mqtt.client as mqtt
 import trio
 
 from frigate_monitoring.actions.base import Action
 from frigate_monitoring.config import Config, get_config
 from frigate_monitoring.enabled import POLL_INTERVAL_SECONDS, EnabledCheck
+from frigate_monitoring.event import FrigateEvent
 from frigate_monitoring.filter import ReviewFilter
 from frigate_monitoring.recorder import MqttRecorder
 from frigate_monitoring.review import FrigateReview
@@ -23,26 +25,23 @@ _RECONNECT_MIN_DELAY = 1.0
 _RECONNECT_MAX_DELAY = 120.0
 
 
+def _with_events(review: FrigateReview, events: list[FrigateEvent]) -> FrigateReview:
+    """Return a copy of *review* with its resolved events replaced."""
+    copy = attrs.evolve(review)
+    copy.events = events
+    return copy
+
+
 class FrigateListener:
     """Connect to the MQTT broker, subscribe to Frigate reviews, and dispatch them.
 
-    Every MQTT message updates the :class:`ReviewTracker` so event scores and
-    review state accumulate across the review lifecycle.  Actions using
-    ``triggers`` fire at the right moment:
+    Every MQTT message updates the :class:`ReviewTracker` so event scores
+    accumulate across the review lifecycle.  Actions using ``triggers`` fire
+    at the right moment:
 
-    * ``"start"`` — first time the review matches the action's filter
-    * ``"best"`` — once at review end, with the best event selected by score
-
-    Usage
-    -----
-    ::
-
-        listener = FrigateListener()
-        listener.add_action(PrintAction(
-            template="[{camera}] {severity}: {objects}",
-            event_filter=ReviewFilter(triggers=["start"], alerts_only=True),
-        ))
-        trio.run(listener.run)  # blocks; Ctrl-C to stop
+    * ``"start"`` — first time the review matches the action's filter,
+      including having at least one event satisfying event-level criteria
+    * ``"best"`` — once at review end, with all events at their final scores
 
     Parameters
     ----------
@@ -192,14 +191,18 @@ class FrigateListener:
     async def dispatch(self, review: FrigateReview) -> None:
         """Update the tracker, resolve events, and run matching actions.
 
-        On every message the tracker accumulates event state and re-evaluates
-        the best event.  Actions with ``triggers`` fire at the right moment:
+        On every message the tracker accumulates event state.  Actions with
+        ``triggers`` fire at the right moment:
 
         * ``"start"`` — checked on every message; fires the first time the
-          review matches a given action's filter (e.g. when severity upgrades
-          from detection to alert).
+          review matches a given action's filter, including having at least one
+          event that satisfies the action's event-level criteria (e.g. labels).
         * ``"best"`` — fires once when ``review_type == "end"``.
         * Filters without ``triggers`` fire on every matching message.
+
+        Each action receives a review whose events are pre-filtered to only
+        those satisfying that action's event-level criteria.  If no events
+        match, the action is skipped for this message.
         """
         tracked = self._tracker.update(review)
 
@@ -213,33 +216,36 @@ class FrigateListener:
             )
             return
 
+        if not review.events:
+            if review.review_type == "end":
+                self._tracker.end(review.review_id)
+            return
+
         is_end = review.review_type == "end"
 
         async with trio.open_nursery() as nursery:
             for action_idx, (action, filt, enabled) in enumerate(self._actions):
                 if not enabled:
                     continue
+                filtered_events = filt.filter_events(review.events)
+                if not filtered_events:
+                    continue
+                filtered_review = _with_events(review, filtered_events)
                 if filt.triggers is not None:
-                    if filt.matches(review, trigger="start"):
+                    if filt.matches(filtered_review, trigger="start"):
                         if self._tracker.should_fire_start(
                             review.review_id, action_idx
                         ):
-                            review.trigger = "start"
-                            nursery.start_soon(self._safe_handle, action, review)
-                    if is_end and filt.matches(review, trigger="best"):
-                        if tracked.best_changed_since_start(action_idx):
-                            review.trigger = "best"
-                            nursery.start_soon(self._safe_handle, action, review)
-                        else:
-                            log.debug(
-                                "Skipping 'best' for review %s action %d:"
-                                " best event unchanged since 'start'",
-                                review.review_id,
-                                action_idx,
+                            filtered_review.trigger = "start"
+                            nursery.start_soon(
+                                self._safe_handle, action, filtered_review
                             )
+                    if is_end and filt.matches(filtered_review, trigger="best"):
+                        filtered_review.trigger = "best"
+                        nursery.start_soon(self._safe_handle, action, filtered_review)
                 else:
-                    if filt.matches(review):
-                        nursery.start_soon(self._safe_handle, action, review)
+                    if filt.matches(filtered_review):
+                        nursery.start_soon(self._safe_handle, action, filtered_review)
 
         if is_end:
             self._tracker.end(review.review_id)

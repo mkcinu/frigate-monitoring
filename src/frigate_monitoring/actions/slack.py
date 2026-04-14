@@ -45,8 +45,8 @@ class SlackAction(Action):
           - type: slack
             bot_token: ${SLACK_BOT_TOKEN}
             channel: ${SLACK_CHANNEL}   # must be a channel ID, e.g. C0123456789
-            title: "Frigate: {{ label }} spotted"
-            message: "{{ label }} on *{{ camera }}* ({{ score_pct }})"
+            title: "Frigate alert on {{ camera }}"
+            message: "{{ events | map(attribute='label') | join(', ') }} detected"
             attach_gif: true
             filter:
               alerts_only: true
@@ -57,12 +57,12 @@ class SlackAction(Action):
     Slack *mrkdwn* formatting (``*bold*``, ``_italic_``, ``<url|text>`` links,
     etc.).
 
-    When ``attach_snapshot`` and/or ``attach_gif`` are ``True``, the
-    corresponding files are fetched and uploaded via the Slack Files API
-    (``files.getUploadURLExternal`` → upload →
-    ``files.completeUploadExternal``).  Both can be enabled at once; they
-    are posted together as a multi-file message with ``message`` as the
-    caption.  When neither is enabled, a Block Kit message with a header
+    When ``attach_snapshot`` and/or ``attach_gif`` are ``True``, files are
+    uploaded via the Slack Files API (``files.getUploadURLExternal`` → upload →
+    ``files.completeUploadExternal``).  With ``attach_snapshot``, one image is
+    uploaded per event that has a snapshot available.  Both can be enabled at
+    once; they are posted together as a multi-file message with ``message`` as
+    the caption.  When neither is enabled, a Block Kit message with a header
     and body section is sent instead.
 
     Parameters
@@ -80,7 +80,8 @@ class SlackAction(Action):
     message:
         Notification body template.  Supports Slack *mrkdwn* formatting.
     attach_snapshot:
-        When ``True``, fetch and upload the best-event JPEG snapshot.
+        When ``True``, upload the cropped snapshot for each event that has
+        one available.
     attach_gif:
         When ``True``, fetch and upload the review-level animated GIF.
     username:
@@ -91,8 +92,8 @@ class SlackAction(Action):
 
     bot_token: str
     channel: str
-    title: str = "Frigate: {{ label }} on {{ camera }}"
-    message: str = "{{ label }} detected ({{ score_pct }})"
+    title: str = "Frigate alert on {{ camera }}"
+    message: str = "{{ events | map(attribute='label') | join(', ') }} detected"
     attach_snapshot: bool = True
     attach_gif: bool = False
     username: str = ""
@@ -197,17 +198,19 @@ class SlackAction(Action):
         file_entries: list[dict[str, str]] = []
 
         if self.attach_snapshot:
-            resp = await client.get(review.snapshot_url_cropped, timeout=15.0)
-            resp.raise_for_status()
-            fid = await self._upload_file(
-                client,
-                headers,
-                resp.content,
-                "snapshot_cropped.jpg",
-                "image/jpeg",
-                title,
-            )
-            file_entries.append({"id": fid, "title": title})
+            for ev in review.events:
+                if ev.snapshot_bytes is None:
+                    continue
+                alt = f"{ev.label} snapshot"
+                fid = await self._upload_file(
+                    client,
+                    headers,
+                    ev.snapshot_bytes,
+                    f"snapshot_{ev.event_id}.jpg",
+                    "image/jpeg",
+                    alt,
+                )
+                file_entries.append({"id": fid, "title": alt})
 
         if self.attach_gif:
             resp = await client.get(review.gif_url, timeout=30.0)
@@ -216,6 +219,10 @@ class SlackAction(Action):
                 client, headers, resp.content, "review.gif", "image/gif", title
             )
             file_entries.append({"id": fid, "title": title})
+
+        if not file_entries:
+            await self._post_blocks(client, headers, title, message)
+            return
 
         complete_payload: dict[str, Any] = {
             "files": file_entries,

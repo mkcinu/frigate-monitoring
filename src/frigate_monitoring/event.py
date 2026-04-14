@@ -1,7 +1,7 @@
 """FrigateEvent: per-detection detail fetched from the Frigate HTTP API.
 
 Use :meth:`FrigateEvent.fetch` to retrieve a single event by ID, or access
-events through :attr:`~review.FrigateReview.best_event` on a review.
+events through :attr:`~review.FrigateReview.events` on a review.
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ class FrigateEvent:
     stationary: bool
     start_ts: float
     end_ts: float
+    snapshot_bytes: bytes | None = attrs.field(default=None, repr=False)
 
     @property
     def score_pct(self) -> str:
@@ -60,16 +61,6 @@ class FrigateEvent:
         return urls.thumbnail_url(self.event_id)
 
     @property
-    def clip_url(self) -> str:
-        """URL to the MP4 video clip."""
-        return urls.clip_url(self.event_id)
-
-    @property
-    def gif_url(self) -> str:
-        """URL to an animated GIF of the clip."""
-        return urls.gif_url(self.event_id)
-
-    @property
     def external_snapshot_url(self) -> str:
         """External snapshot URL. Requires FRIGATE_EXTERNAL_URL."""
         return urls.snapshot_url(self.event_id, external=True)
@@ -79,25 +70,51 @@ class FrigateEvent:
         """External thumbnail URL. Requires FRIGATE_EXTERNAL_URL."""
         return urls.thumbnail_url(self.event_id, external=True)
 
-    @property
-    def external_clip_url(self) -> str:
-        """External clip URL. Requires FRIGATE_EXTERNAL_URL."""
-        return urls.clip_url(self.event_id, external=True)
-
-    @property
-    def external_gif_url(self) -> str:
-        """External GIF URL. Requires FRIGATE_EXTERNAL_URL."""
-        return urls.gif_url(self.event_id, external=True)
+    def as_template_vars(self) -> dict[str, Any]:
+        """Return a flat dict of event variables for use in templates."""
+        cfg = get_config()
+        d: dict[str, Any] = {
+            "event_id": self.event_id,
+            "label": self.label,
+            "sub_label": self.sub_label,
+            "score": self.score,
+            "score_pct": self.score_pct,
+            "top_score": self.top_score,
+            "top_score_pct": self.top_score_pct,
+            "has_snapshot": self.has_snapshot,
+            "stationary": self.stationary,
+            "snapshot_url": self.snapshot_url,
+            "snapshot_url_cropped": self.snapshot_url_cropped,
+            "thumbnail_url": self.thumbnail_url,
+        }
+        if cfg.frigate_external_url:
+            d["external_snapshot_url"] = self.external_snapshot_url
+            d["external_thumbnail_url"] = self.external_thumbnail_url
+        return d
 
     @classmethod
     async def fetch(cls, event_id: str) -> "FrigateEvent":
-        """Fetch event details from the Frigate HTTP API."""
+        """Fetch event details and snapshot content from the Frigate HTTP API.
+
+        The cropped+bbox snapshot is fetched in the same session and stored in
+        :attr:`snapshot_bytes`.  If no snapshot is available yet (404) or the
+        fetch fails, :attr:`snapshot_bytes` is left as ``None``.
+        """
         cfg = get_config()
-        url = f"{cfg.frigate_base_url}/api/events/{event_id}"
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url)
+            resp = await client.get(f"{cfg.frigate_base_url}/api/events/{event_id}")
             resp.raise_for_status()
-            return cls._from_api(resp.json())
+            event = cls._from_api(resp.json())
+
+            if event.has_snapshot:
+                snap_resp = await client.get(
+                    urls.snapshot_url(event_id, bbox=True, cropped=True),
+                    timeout=15.0,
+                )
+                if snap_resp.status_code == 200:
+                    event.snapshot_bytes = snap_resp.content
+
+        return event
 
     @classmethod
     def _from_api(cls, data: dict[str, Any]) -> FrigateEvent:

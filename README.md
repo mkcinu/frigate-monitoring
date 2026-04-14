@@ -31,7 +31,7 @@ from frigate_monitoring.listener import FrigateListener
 
 listener = FrigateListener()
 listener.add_action(
-    PrintAction(template="[{{ camera }}] {{ label }} ({{ score_pct }})"),
+    PrintAction(template="[{{ camera }}] {{ objects | join(', ') }}"),
     filter=ReviewFilter(alerts_only=True, triggers=["best"]),
 )
 listener.run()
@@ -59,7 +59,7 @@ frigate:
 
 actions:
   - type: print
-    template: "[{{ camera }}] {{ severity }}: {{ objects | join(', ') }} ({{ score_pct }})"
+    template: "[{{ camera }}] {{ severity }}: {{ objects | join(', ') }}"
     filter:
       cameras: [front_door, back_door]
       alerts_only: true
@@ -68,7 +68,7 @@ actions:
     url: https://hooks.example.com/frigate
     method: POST
     body:
-      text: "{{ label }} detected on {{ camera }} ({{ score_pct }})"
+      text: "{{ events | map(attribute='label') | join(', ') }} detected on {{ camera }}"
       camera: "{{ camera }}"
     headers:
       Authorization: "Bearer ${WEBHOOK_TOKEN}"
@@ -89,7 +89,7 @@ actions:
   - type: slack
     bot_token: ${SLACK_BOT_TOKEN}
     channel: ${SLACK_CHANNEL}   # must be a channel ID, e.g. C0123456789
-    message: "*{{ label }}* ({{ score_pct }}) on *{{ camera }}* | zones: {{ zones | join(', ') }}"
+    message: "{{ events | map(attribute='label') | join(', ') }} on *{{ camera }}* | zones: {{ zones | join(', ') }}"
     attach_gif: true
     filter:
       alerts_only: true
@@ -127,16 +127,20 @@ frigate-monitor --config config.yaml
 ReviewFilter(
     alerts_only=True,           # skip detection-severity reviews
     cameras=["front_door"],     # restrict to these cameras
-    objects=["person", "car"],  # at least one of these must be present
+    labels=["person", "car"],   # at least one event with this label must be present
+    objects=["person", "car"],  # at least one of these object types must be in the review
     zones=["driveway"],         # at least one of these zones must be active
     triggers=["start", "best"], # "start" = first match, "best" = at review end
 )
 ```
 
 **Triggers** control when actions fire during a review's lifecycle:
-- `"start"` — fires once, the first time the review matches the filter (e.g. when
-  severity upgrades from detection to alert for an `alerts_only` filter)
-- `"best"` — fires once when the review ends, with the best event selected by score
+- `"start"` — fires once, the first time the review matches the filter (including
+  having at least one event satisfying label/zone criteria)
+- `"best"` — fires once when the review ends, with all events at their final scores
+
+The action receives a review whose `events` list is pre-filtered to only those
+matching the action's `labels` and `zones` criteria.
 
 All criteria are AND-ed together; omit any to match everything for that dimension.
 

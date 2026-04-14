@@ -20,7 +20,7 @@ class PrintAction(Action):
     template:
         A Jinja2 template string using the variables listed in
         :mod:`review` module docstring.
-        Example: ``"[{{ camera }}] {{ severity }}: {{ objects | join(', ') }} — {{ score_pct }}"``
+        Example: ``"[{{ camera }}] {{ severity }}: {{ objects | join(', ') }}"``
     """
 
     DEFAULT_TEMPLATE: ClassVar[str] = DEFAULT_TEMPLATE

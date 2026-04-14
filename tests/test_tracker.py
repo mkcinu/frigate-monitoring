@@ -1,4 +1,4 @@
-"""Tests for ReviewTracker and event ranking."""
+"""Tests for ReviewTracker."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from tests.conftest import make_payload
 
 from frigate_monitoring.event import FrigateEvent
 from frigate_monitoring.review import FrigateReview
-from frigate_monitoring.tracker import ReviewTracker, event_rank, pick_best
+from frigate_monitoring.tracker import ReviewTracker
 
 
 def _event(
@@ -36,42 +36,6 @@ def _event(
 
 def _review(**kwargs: object) -> FrigateReview:
     return FrigateReview.from_payload(make_payload(**kwargs))  # type: ignore[arg-type]
-
-
-class TestEventRank:
-    def test_higher_top_score_wins(self) -> None:
-        low = _event(top_score=0.7)
-        high = _event(top_score=0.95)
-        assert event_rank(high) > event_rank(low)
-
-    def test_snapshot_preferred(self) -> None:
-        no_snap = _event(top_score=0.9, has_snapshot=False)
-        has_snap = _event(top_score=0.9, has_snapshot=True)
-        assert event_rank(has_snap) > event_rank(no_snap)
-
-    def test_moving_preferred_over_stationary(self) -> None:
-        still = _event(top_score=0.9, stationary=True)
-        moving = _event(top_score=0.9, stationary=False)
-        assert event_rank(moving) > event_rank(still)
-
-    def test_score_breaks_tie(self) -> None:
-        low_score = _event(top_score=0.9, score=0.7)
-        high_score = _event(top_score=0.9, score=0.85)
-        assert event_rank(high_score) > event_rank(low_score)
-
-
-class TestPickBest:
-    def test_empty_returns_none(self) -> None:
-        assert pick_best([]) is None
-
-    def test_single_event(self) -> None:
-        ev = _event()
-        assert pick_best([ev]) is ev
-
-    def test_picks_highest_ranked(self) -> None:
-        low = _event(event_id="low", top_score=0.5)
-        high = _event(event_id="high", top_score=0.95)
-        assert pick_best([low, high]) is high
 
 
 class TestReviewTracker:
@@ -134,64 +98,27 @@ class TestReviewTracker:
         assert tracker.get("r3") is not None
         assert tracker.get("r4") is not None
 
-    def test_add_events_updates_best(self) -> None:
-        tracker = ReviewTracker()
-        review = _review()
-        tracked = tracker.update(review)
-        low = _event(event_id="low", top_score=0.5)
-        high = _event(event_id="high", top_score=0.95)
-        tracked.add_events([low, high])
-        assert tracked.best_event is high
-
     def test_add_events_accumulates(self) -> None:
         tracker = ReviewTracker()
         review = _review()
         tracked = tracker.update(review)
         tracked.add_events([_event(event_id="ev1", top_score=0.5)])
         tracked.add_events([_event(event_id="ev2", top_score=0.95)])
-        assert tracked.best_event is not None
-        assert tracked.best_event.event_id == "ev2"
         assert len(tracked.events) == 2
 
-    def test_add_events_replaces_same_id_with_updated_score(self) -> None:
+    def test_add_events_replaces_with_higher_score(self) -> None:
         tracker = ReviewTracker()
         review = _review()
         tracked = tracker.update(review)
         tracked.add_events([_event(event_id="ev1", top_score=0.5)])
         tracked.add_events([_event(event_id="ev1", top_score=0.95)])
         assert len(tracked.events) == 1
-        assert tracked.best_event is not None
-        assert tracked.best_event.top_score == 0.95
+        assert tracked.events["ev1"].top_score == 0.95
 
-    def test_best_changed_since_start_when_same(self) -> None:
+    def test_add_events_keeps_better_existing(self) -> None:
         tracker = ReviewTracker()
         review = _review()
         tracked = tracker.update(review)
-        tracked.add_events([_event(event_id="ev1", top_score=0.9)])
-        tracked.mark_started(action_idx=0)
-        assert not tracked.best_changed_since_start(action_idx=0)
-
-    def test_best_changed_since_start_when_different(self) -> None:
-        tracker = ReviewTracker()
-        review = _review()
-        tracked = tracker.update(review)
-        tracked.add_events([_event(event_id="ev1", top_score=0.5)])
-        tracked.mark_started(action_idx=0)
-        tracked.add_events([_event(event_id="ev2", top_score=0.95)])
-        assert tracked.best_changed_since_start(action_idx=0)
-
-    def test_best_changed_since_start_when_score_improved(self) -> None:
-        tracker = ReviewTracker()
-        review = _review()
-        tracked = tracker.update(review)
-        tracked.add_events([_event(event_id="ev1", top_score=0.5)])
-        tracked.mark_started(action_idx=0)
         tracked.add_events([_event(event_id="ev1", top_score=0.95)])
-        assert tracked.best_changed_since_start(action_idx=0)
-
-    def test_best_changed_since_start_without_start(self) -> None:
-        tracker = ReviewTracker()
-        review = _review()
-        tracked = tracker.update(review)
-        tracked.add_events([_event(event_id="ev1", top_score=0.9)])
-        assert tracked.best_changed_since_start(action_idx=0)
+        tracked.add_events([_event(event_id="ev1", top_score=0.5)])
+        assert tracked.events["ev1"].top_score == 0.95

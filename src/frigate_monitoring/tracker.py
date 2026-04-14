@@ -5,14 +5,13 @@ maintains a living view of each active review so that trigger-based actions can
 fire at the right moment — e.g. ``start`` fires on the first message that
 matches a given action's filter, and ``best`` fires once at review end.
 
-Events are accumulated across all messages for a review and ranked by their
-scores to determine the best event at any point in time.
+Events are accumulated across all messages for a review.  Each event is only
+replaced when a newer version with a higher top_score is fetched.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
 
 import attrs
 import trio
@@ -23,30 +22,6 @@ from frigate_monitoring.review import FrigateReview
 log = logging.getLogger(__name__)
 
 
-def event_rank(event: FrigateEvent) -> tuple[float, float, int, int]:
-    """Return a sort key for ranking events — higher is better.
-
-    Criteria (in order of importance):
-    1. Top score (best confidence seen during tracking)
-    2. Current score
-    3. Has snapshot available
-    4. Not stationary (moving objects are more interesting)
-    """
-    return (
-        event.top_score,
-        event.score,
-        int(event.has_snapshot),
-        int(not event.stationary),
-    )
-
-
-def pick_best(events: Sequence[FrigateEvent]) -> FrigateEvent | None:
-    """Return the highest-ranked event, or ``None`` if *events* is empty."""
-    if not events:
-        return None
-    return max(events, key=event_rank)
-
-
 @attrs.define
 class TrackedReview:
     """State accumulated for a single review across its MQTT lifecycle.
@@ -54,56 +29,30 @@ class TrackedReview:
     A Frigate review spans multiple MQTT messages (new → update… → end).
     This class holds the living state so we can:
 
-    * accumulate all events and continuously pick the best by score
+    * accumulate all events and keep the best version of each
     * remember which actions already fired their ``"start"`` trigger,
       so each action fires at most once per review (keyed by the
       action's index in the listener's action list)
-    * remember the best event at ``"start"`` time so ``"best"`` can be
-      skipped when the best event hasn't changed
     """
 
     review: FrigateReview
     events: dict[str, FrigateEvent] = attrs.field(factory=dict[str, FrigateEvent])
-    best_event: FrigateEvent | None = attrs.field(default=None)
     _started_actions: dict[int, bool] = attrs.field(factory=dict[int, bool])
-    # (event_id, top_score) captured when "start" fired, per action index.
-    # Used by best_changed_since_start to detect not only a different best
-    # event but also a score improvement on the *same* event — Frigate
-    # continuously refines scores while tracking an object.
-    _start_best: dict[int, tuple[str, float]] = attrs.field(
-        factory=dict[int, tuple[str, float]]
-    )
 
     def mark_started(self, action_idx: int) -> None:
         """Record that action *action_idx* has fired its ``"start"`` trigger."""
         self._started_actions[action_idx] = True
-        if self.best_event is not None:
-            self._start_best[action_idx] = (
-                self.best_event.event_id,
-                self.best_event.top_score,
-            )
 
     def has_started(self, action_idx: int) -> bool:
         """Return whether action *action_idx* already fired ``"start"``."""
         return self._started_actions.get(action_idx, False)
 
-    def best_changed_since_start(self, action_idx: int) -> bool:
-        """Return whether the best event changed or improved since ``"start"`` time."""
-        start = self._start_best.get(action_idx)
-        if start is None:
-            return True
-        if self.best_event is None:
-            return True
-        start_eid, start_score = start
-        if self.best_event.event_id != start_eid:
-            return True
-        return self.best_event.top_score > start_score
-
     def add_events(self, new_events: list[FrigateEvent]) -> None:
-        """Merge newly fetched events and re-evaluate the best."""
+        """Merge newly fetched events, only replacing if the new version is better."""
         for ev in new_events:
-            self.events[ev.event_id] = ev
-        self.best_event = pick_best(list(self.events.values()))
+            existing = self.events.get(ev.event_id)
+            if existing is None or ev.top_score > existing.top_score:
+                self.events[ev.event_id] = ev
 
 
 @attrs.define
@@ -154,16 +103,18 @@ class ReviewTracker:
         return self._reviews.get(review_id)
 
     async def resolve_events(self, tracked: TrackedReview) -> None:
-        """Fetch events and re-evaluate the best.
+        """Fetch events and update the tracked state.
 
         On intermediate messages (new/update): only fetches event IDs not yet
         cached, since we just need to discover new detections.
 
         On end: re-fetches all events to pick up final scores and snapshots
         (Frigate continuously improves these while the object is tracked).
+        Each event is only updated if the new version has a higher top_score.
         """
         review = tracked.review
         if not review.event_ids:
+            review.events = list(tracked.events.values())
             return
 
         is_end = review.review_type == "end"
@@ -175,8 +126,7 @@ class ReviewTracker:
             ]
 
         if not ids_to_fetch:
-            if tracked.best_event is not None:
-                review.best_event = tracked.best_event
+            review.events = list(tracked.events.values())
             return
 
         new_events: list[FrigateEvent] = []
@@ -202,27 +152,8 @@ class ReviewTracker:
             for eid in ids_to_fetch:
                 nursery.start_soon(_fetch, eid)
 
-        old_best = tracked.best_event
         tracked.add_events(new_events)
-
-        if tracked.best_event is not None:
-            review.best_event = tracked.best_event
-            if old_best is None or old_best.event_id != tracked.best_event.event_id:
-                be = tracked.best_event
-                log.debug(
-                    "Best event updated for review %s: %s (label=%s top_score=%.3f)",
-                    review.review_id,
-                    be.event_id,
-                    be.label,
-                    be.top_score,
-                )
-            elif old_best.top_score != tracked.best_event.top_score:
-                log.debug(
-                    "Best event %s score improved: %.3f → %.3f",
-                    tracked.best_event.event_id,
-                    old_best.top_score,
-                    tracked.best_event.top_score,
-                )
+        review.events = list(tracked.events.values())
 
     def should_fire_start(self, review_id: str, action_idx: int) -> bool:
         """Return ``True`` the first time ``start`` is requested for *(review, action)*.
@@ -239,19 +170,13 @@ class ReviewTracker:
         return True
 
     def end(self, review_id: str) -> None:
-        """Remove a review from tracking and evict overflow if needed."""
+        """Remove a review from tracking."""
         tracked = self._reviews.pop(review_id, None)
         if tracked is not None:
-            best = tracked.best_event
             log.debug(
-                "Review ended %s: %d events tracked, best=%s",
+                "Review ended %s: %d events tracked",
                 review_id,
                 len(tracked.events),
-                (
-                    f"{best.event_id} (label={best.label} top_score={best.top_score:.3f})"
-                    if best
-                    else "none"
-                ),
             )
         self._evict()
 

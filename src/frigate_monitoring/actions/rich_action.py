@@ -174,18 +174,20 @@ class RichAction(Action):
 
         body = Text(overflow="fold")
 
-        try:
-            be = review.best_event
-            icon = _OBJECT_ICON.get(be.label, "📦")
-            label_text = f"{icon} {be.label}"
-            if be.sub_label:
-                label_text += f" ({be.sub_label})"
-            body.append(label_text, style="dim" if ended else "bold")
-            body.append(f"  {be.score_pct}", style="dim" if ended else "green")
-            if abs(be.top_score - be.score) > 0.005:
-                body.append(f" · top {be.top_score_pct}", style="dim")
-        except RuntimeError:
-            body.append("📦 …", style="dim")
+        if review.events:
+            for ev in review.events:
+                icon = _OBJECT_ICON.get(ev.label, "📦")
+                label_text = f"{icon} {ev.label}"
+                if ev.sub_label:
+                    label_text += f" ({ev.sub_label})"
+                body.append(label_text, style="dim" if ended else "bold")
+                body.append(f"  {ev.score_pct}", style="dim" if ended else "green")
+                if abs(ev.top_score - ev.score) > 0.005:
+                    body.append(f" · top {ev.top_score_pct}", style="dim")
+                body.append("  ", style="dim")
+            body.append("\n")
+        else:
+            body.append("📦 …\n", style="dim")
 
         zones_str = ", ".join(review.zones) if review.zones else "—"
         body.append(f"   📍 {zones_str}", style="dim")
@@ -197,18 +199,6 @@ class RichAction(Action):
             body.append(f" → {review.end_time}", style="dim")
         body.append(f"  ({review.duration:.0f}s)", style="dim")
         body.append("\n")
-
-        try:
-            be = review.best_event
-            if be.has_clip:
-                body.append("🎞  ", style="dim")
-                body.append(be.gif_url, style="dim")
-                body.append("\n")
-                body.append("🎬  ", style="dim")
-                body.append(be.clip_url, style="dim")
-                body.append("\n")
-        except RuntimeError:
-            pass
 
         border_style = "dim" if ended else ("red" if is_alert else "yellow")
         return Panel(body, title=title, border_style=border_style, padding=(0, 1))

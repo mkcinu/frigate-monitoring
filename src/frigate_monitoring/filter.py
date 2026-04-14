@@ -6,6 +6,7 @@ from datetime import datetime, time
 
 import attrs
 
+from frigate_monitoring.event import FrigateEvent
 from frigate_monitoring.review import FrigateReview
 from frigate_monitoring.types import Trigger, Weekday
 
@@ -47,22 +48,25 @@ class ReviewFilter:
     """Restrict to these camera names.  ``None`` matches any camera."""
 
     labels: list[str] | None = None
-    """Restrict to reviews whose best-event label is one of these values
+    """Restrict to reviews where at least one resolved event's label matches
     (e.g. ``["person", "car"]``).  ``None`` matches any label."""
 
     objects: list[str] | None = None
     """Restrict to reviews containing at least one of these object types."""
 
     triggers: list[Trigger] | None = None
-    """Semantic triggers: ``"start"`` fires on the first matching message,
-    ``"best"`` fires once at review end with the best event.
+    """Semantic triggers: ``"start"`` fires the first time the review matches
+    this filter (including having at least one matching event), ``"best"``
+    fires once at review end with final event data.
     ``None`` matches on every MQTT message (new, update, end)."""
 
     alerts_only: bool = False
     """When ``True``, skip detection-severity reviews and only handle alerts."""
 
     zones: list[str] | None = None
-    """Restrict to reviews that include at least one of these zones."""
+    """Restrict to reviews and events that include at least one of these zones.
+    At the review level, checks the review's zone list.  At the event level
+    (via :meth:`filter_events`), checks each event's ``entered_zones``."""
 
     weekdays: list[Weekday] | None = None
     """Restrict to reviews starting on these days of the week.
@@ -77,6 +81,21 @@ class ReviewFilter:
     matches 22:00-06:00.
     """
 
+    def filter_events(self, events: list[FrigateEvent]) -> list[FrigateEvent]:
+        """Return the subset of *events* that satisfy event-level criteria.
+
+        Filters by :attr:`labels` and :attr:`zones` (via the event's
+        ``entered_zones``).  Returns all events if no event-level criteria
+        are set.
+        """
+        result = events
+        if self.labels:
+            result = [e for e in result if e.label in self.labels]
+        if self.zones:
+            zones_set = set(self.zones)
+            result = [e for e in result if zones_set.intersection(e.entered_zones)]
+        return result
+
     def matches(self, review: FrigateReview, *, trigger: str | None = None) -> bool:
         """Return ``True`` if *review* satisfies every configured criterion.
 
@@ -90,10 +109,7 @@ class ReviewFilter:
         if self.cameras and review.camera not in self.cameras:
             return False
         if self.labels:
-            try:
-                if review.best_event.label not in self.labels:
-                    return False
-            except RuntimeError:
+            if not any(e.label in self.labels for e in review.events):
                 return False
         if self.objects and not set(review.objects).intersection(self.objects):
             return False

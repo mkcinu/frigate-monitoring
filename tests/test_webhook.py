@@ -15,7 +15,7 @@ from frigate_monitoring.review import FrigateReview
 
 def _review_with_event(event: FrigateEvent) -> FrigateReview:
     review = FrigateReview.from_payload(make_payload())
-    review._best_event = event
+    review.events = [event]
     return review
 
 
@@ -39,7 +39,10 @@ async def test_sends_post_with_template_vars(fake_event: FrigateEvent) -> None:
 
         action = WebhookAction(
             url="https://example.com/hook",
-            body={"text": "{{ label }} on {{ camera }}", "cam": "{{ camera }}"},
+            body={
+                "text": "{{ events[0].label }} on {{ camera }}",
+                "cam": "{{ camera }}",
+            },
         )
         await action.handle(_review_with_event(fake_event))
 
@@ -107,5 +110,5 @@ async def test_default_body_sends_all_vars(fake_event: FrigateEvent) -> None:
 
     body = json.loads(mock_client.request.call_args.kwargs["content"])
     assert "camera" in body
-    assert "label" in body
+    assert "events" in body
     assert body["camera"] == "front_door"
