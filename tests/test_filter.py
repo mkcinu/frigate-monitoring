@@ -8,6 +8,7 @@ from tests.conftest import make_payload
 
 from frigate_monitoring.filter import ReviewFilter
 from frigate_monitoring.review import FrigateReview
+from frigate_monitoring.types import Weekday
 
 
 def _review(**kwargs: object) -> FrigateReview:
@@ -123,6 +124,23 @@ def test_time_range_none_matches_any_time() -> None:
     f = ReviewFilter()
     assert f.matches(_review_at(time(3, 0)))
     assert f.matches(_review_at(time(15, 0)))
+
+
+def test_weekdays_filter() -> None:
+    # 2026-04-14 is a Tuesday (weekday=1)
+    tuesday = datetime(2026, 4, 14, 12, 0).timestamp()
+    monday = datetime(2026, 4, 13, 12, 0).timestamp()
+
+    f = ReviewFilter(weekdays=[Weekday.TUE])
+    assert f.matches(_review(start_time=tuesday))
+    assert not f.matches(_review(start_time=monday))
+
+    f = ReviewFilter(weekdays=[Weekday.MON, Weekday.TUE])
+    assert f.matches(_review(start_time=monday))
+    assert f.matches(_review(start_time=tuesday))
+
+    f = ReviewFilter(weekdays=[Weekday.MON])
+    assert not f.matches(_review(start_time=tuesday))
 
 
 def test_combined_filters_all_must_match() -> None:

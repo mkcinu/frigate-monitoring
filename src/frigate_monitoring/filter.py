@@ -7,7 +7,7 @@ from datetime import datetime, time
 import attrs
 
 from frigate_monitoring.review import FrigateReview
-from frigate_monitoring.types import Trigger
+from frigate_monitoring.types import Trigger, Weekday
 
 
 @attrs.define
@@ -37,6 +37,10 @@ class ReviewFilter:
             triggers=["start", "best"],
             time_range=(time(22, 0), time(6, 0)),
         )
+
+    Only reviews on weekends::
+
+        ReviewFilter(weekdays=[Weekday.SAT, Weekday.SUN])
     """
 
     cameras: list[str] | None = None
@@ -59,6 +63,11 @@ class ReviewFilter:
 
     zones: list[str] | None = None
     """Restrict to reviews that include at least one of these zones."""
+
+    weekdays: list[Weekday] | None = None
+    """Restrict to reviews starting on these days of the week.
+    0 is Monday, 6 is Sunday.
+    """
 
     time_range: tuple[time, time] | None = None
     """Restrict to reviews whose start time falls within this range.
@@ -94,6 +103,11 @@ class ReviewFilter:
         if self.alerts_only and not review.is_alert:
             return False
         if self.zones and not set(review.zones).intersection(self.zones):
+            return False
+        if (
+            self.weekdays is not None
+            and datetime.fromtimestamp(review.start_ts).weekday() not in self.weekdays
+        ):
             return False
         if self.time_range is not None:
             t = datetime.fromtimestamp(review.start_ts).time()

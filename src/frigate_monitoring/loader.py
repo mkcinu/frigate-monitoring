@@ -60,6 +60,7 @@ from frigate_monitoring.config import Config, init, load_dotenv
 from frigate_monitoring.enabled import EnabledCheck, structure_enabled
 from frigate_monitoring.filter import ReviewFilter
 from frigate_monitoring.listener import FrigateListener
+from frigate_monitoring.types import Weekday
 
 log = logging.getLogger(__name__)
 
@@ -78,6 +79,10 @@ _converter = cattrs.Converter(forbid_extra_keys=True)
 _converter.register_structure_hook(
     time,
     lambda v, _: v if isinstance(v, time) else time.fromisoformat(str(v)),
+)
+_converter.register_structure_hook(
+    Weekday,
+    lambda v, _: v if isinstance(v, Weekday) else Weekday.from_str(str(v)),
 )
 
 

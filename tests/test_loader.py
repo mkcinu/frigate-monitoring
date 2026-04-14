@@ -11,6 +11,7 @@ from frigate_monitoring.actions.log_action import LogAction
 from frigate_monitoring.actions.print_action import PrintAction
 from frigate_monitoring.actions.webhook import WebhookAction
 from frigate_monitoring.loader import from_yaml
+from frigate_monitoring.types import Weekday
 
 
 def test_load_minimal_config(tmp_path: Path) -> None:
@@ -118,6 +119,19 @@ actions:
     listener = from_yaml(config_file)
     _, filt, _ = listener._actions[0]
     assert filt.time_range == (time(22, 0), time(6, 0))
+
+
+def test_weekday_filter_from_yaml(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text("""
+actions:
+  - type: print
+    filter:
+      weekdays: [Monday, wed, 4]
+""")
+    listener = from_yaml(config_file)
+    _, filt, _ = listener._actions[0]
+    assert filt.weekdays == [Weekday.MON, Weekday.WED, Weekday.FRI]
 
 
 def test_record_section(tmp_path: Path) -> None:
