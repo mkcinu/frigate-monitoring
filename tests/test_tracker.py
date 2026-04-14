@@ -180,6 +180,15 @@ class TestReviewTracker:
         tracked.add_events([_event(event_id="ev2", top_score=0.95)])
         assert tracked.best_changed_since_start(action_idx=0)
 
+    def test_best_changed_since_start_when_score_improved(self) -> None:
+        tracker = ReviewTracker()
+        review = _review()
+        tracked = tracker.update(review)
+        tracked.add_events([_event(event_id="ev1", top_score=0.5)])
+        tracked.mark_started(action_idx=0)
+        tracked.add_events([_event(event_id="ev1", top_score=0.95)])
+        assert tracked.best_changed_since_start(action_idx=0)
+
     def test_best_changed_since_start_without_start(self) -> None:
         tracker = ReviewTracker()
         review = _review()

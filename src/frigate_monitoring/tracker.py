@@ -66,26 +66,38 @@ class TrackedReview:
     events: dict[str, FrigateEvent] = attrs.field(factory=dict[str, FrigateEvent])
     best_event: FrigateEvent | None = attrs.field(default=None)
     _started_actions: dict[int, bool] = attrs.field(factory=dict[int, bool])
-    _start_event_ids: dict[int, str] = attrs.field(factory=dict[int, str])
+    # (event_id, top_score) captured when "start" fired, per action index.
+    # Used by best_changed_since_start to detect not only a different best
+    # event but also a score improvement on the *same* event — Frigate
+    # continuously refines scores while tracking an object.
+    _start_best: dict[int, tuple[str, float]] = attrs.field(
+        factory=dict[int, tuple[str, float]]
+    )
 
     def mark_started(self, action_idx: int) -> None:
         """Record that action *action_idx* has fired its ``"start"`` trigger."""
         self._started_actions[action_idx] = True
         if self.best_event is not None:
-            self._start_event_ids[action_idx] = self.best_event.event_id
+            self._start_best[action_idx] = (
+                self.best_event.event_id,
+                self.best_event.top_score,
+            )
 
     def has_started(self, action_idx: int) -> bool:
         """Return whether action *action_idx* already fired ``"start"``."""
         return self._started_actions.get(action_idx, False)
 
     def best_changed_since_start(self, action_idx: int) -> bool:
-        """Return whether the best event differs from what it was at ``"start"`` time."""
-        start_eid = self._start_event_ids.get(action_idx)
-        if start_eid is None:
+        """Return whether the best event changed or improved since ``"start"`` time."""
+        start = self._start_best.get(action_idx)
+        if start is None:
             return True
         if self.best_event is None:
             return True
-        return self.best_event.event_id != start_eid
+        start_eid, start_score = start
+        if self.best_event.event_id != start_eid:
+            return True
+        return self.best_event.top_score > start_score
 
     def add_events(self, new_events: list[FrigateEvent]) -> None:
         """Merge newly fetched events and re-evaluate the best."""

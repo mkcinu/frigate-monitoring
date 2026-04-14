@@ -233,7 +233,7 @@ class FrigateListener:
                         else:
                             log.debug(
                                 "Skipping 'best' for review %s action %d:"
-                                " same event as 'start'",
+                                " best event unchanged since 'start'",
                                 review.review_id,
                                 action_idx,
                             )
