@@ -15,7 +15,7 @@ from frigate_monitoring import urls
 from frigate_monitoring.config import get_config
 
 
-@attrs.define
+@attrs.frozen
 class FrigateEvent:
     """Single detection event, populated from the Frigate HTTP events API."""
 
@@ -33,6 +33,11 @@ class FrigateEvent:
     start_ts: float
     end_ts: float
     snapshot_bytes: bytes | None = attrs.field(default=None, repr=False)
+
+    @property
+    def key(self) -> tuple[Any, ...]:
+        """Change-detection key used to compare event state across review updates."""
+        return (self.event_id, round(self.top_score, 3), self.has_snapshot)
 
     @property
     def score_pct(self) -> str:
@@ -112,7 +117,7 @@ class FrigateEvent:
                     timeout=15.0,
                 )
                 if snap_resp.status_code == 200:
-                    event.snapshot_bytes = snap_resp.content
+                    event = attrs.evolve(event, snapshot_bytes=snap_resp.content)
 
         return event
 

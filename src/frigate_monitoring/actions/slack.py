@@ -9,6 +9,7 @@ import httpx
 
 from frigate_monitoring.actions.base import Action, render_template
 from frigate_monitoring.review import FrigateReview
+from frigate_monitoring.tracker import EventKey
 
 _CHAT_POST_URL = "https://slack.com/api/chat.postMessage"
 _FILES_GET_UPLOAD_URL = "https://slack.com/api/files.getUploadURLExternal"
@@ -65,6 +66,16 @@ class SlackAction(Action):
     the caption.  When neither is enabled, a Block Kit message with a header
     and body section is sent instead.
 
+    **Change detection for ``best`` trigger**
+
+    When used with ``triggers: [start, best]``, the action tracks event keys
+    (id, top_score, snapshot availability) at ``start`` time.  At ``best``:
+
+    * If ``attach_gif`` is ``True`` the message is always sent — the GIF alone
+      is worth sending regardless of whether event scores improved.
+    * If ``attach_gif`` is ``False`` and no event has changed since ``start``,
+      the ``best`` notification is suppressed entirely.
+
     Parameters
     ----------
     bot_token:
@@ -84,6 +95,8 @@ class SlackAction(Action):
         one available.
     attach_gif:
         When ``True``, fetch and upload the review-level animated GIF.
+        Also disables the ``best``-trigger change-detection suppression — the
+        GIF is always worth sending even if event scores are unchanged.
     username:
         Override the bot display name for this message.
     icon_emoji:
@@ -98,9 +111,20 @@ class SlackAction(Action):
     attach_gif: bool = False
     username: str = ""
     icon_emoji: str = ""
+    _start_event_keys: dict[str, frozenset[EventKey]] = attrs.field(
+        factory=dict[str, frozenset[EventKey]], init=False, repr=False
+    )
 
     async def handle(self, review: FrigateReview) -> None:
         """Send the Slack notification."""
+        event_keys = frozenset(e.key for e in review.events)
+        if review.trigger == "start":
+            self._start_event_keys[review.review_id] = event_keys
+        elif review.trigger == "best" and not self.attach_gif:
+            start = self._start_event_keys.get(review.review_id)
+            if start is not None and event_keys == start:
+                return
+
         tpl_vars = review.as_template_vars()
         title_text = render_template(self.title, tpl_vars)
         message_text = render_template(self.message, tpl_vars)

@@ -58,35 +58,120 @@ class TestReviewTracker:
         tracker = ReviewTracker()
         review = _review()
         tracker.update(review)
-        assert tracker.should_fire_start(review.review_id, action_idx=0) is True
+        assert (
+            tracker.should_fire_start(review.review_id, action_idx=0, events=[_event()])
+            is True
+        )
 
     def test_should_fire_start_deduplicates(self) -> None:
         tracker = ReviewTracker()
         review = _review()
         tracker.update(review)
-        tracker.should_fire_start(review.review_id, action_idx=0)
-        assert tracker.should_fire_start(review.review_id, action_idx=0) is False
+        tracker.should_fire_start(review.review_id, action_idx=0, events=[_event()])
+        assert (
+            tracker.should_fire_start(review.review_id, action_idx=0, events=[_event()])
+            is False
+        )
 
     def test_different_actions_fire_independently(self) -> None:
         tracker = ReviewTracker()
         review = _review()
         tracker.update(review)
-        assert tracker.should_fire_start(review.review_id, action_idx=0) is True
-        assert tracker.should_fire_start(review.review_id, action_idx=1) is True
-        assert tracker.should_fire_start(review.review_id, action_idx=0) is False
-        assert tracker.should_fire_start(review.review_id, action_idx=1) is False
+        evs = [_event()]
+        assert (
+            tracker.should_fire_start(review.review_id, action_idx=0, events=evs)
+            is True
+        )
+        assert (
+            tracker.should_fire_start(review.review_id, action_idx=1, events=evs)
+            is True
+        )
+        assert (
+            tracker.should_fire_start(review.review_id, action_idx=0, events=evs)
+            is False
+        )
+        assert (
+            tracker.should_fire_start(review.review_id, action_idx=1, events=evs)
+            is False
+        )
 
     def test_should_fire_start_unknown_review(self) -> None:
         tracker = ReviewTracker()
-        assert tracker.should_fire_start("nonexistent", action_idx=0) is False
+        assert (
+            tracker.should_fire_start("nonexistent", action_idx=0, events=[]) is False
+        )
 
     def test_end_clears_state(self) -> None:
         tracker = ReviewTracker()
         review = _review()
         tracker.update(review)
-        tracker.should_fire_start(review.review_id, action_idx=0)
+        tracker.should_fire_start(review.review_id, action_idx=0, events=[_event()])
         tracker.end(review.review_id)
         assert tracker.get(review.review_id) is None
+
+    def test_should_fire_best_identical_events(self) -> None:
+        tracker = ReviewTracker()
+        review = _review()
+        tracker.update(review)
+        evs = [_event()]
+        tracker.should_fire_start(review.review_id, action_idx=0, events=evs)
+        assert (
+            tracker.should_fire_best(review.review_id, action_idx=0, events=evs)
+            is False
+        )
+
+    def test_should_fire_best_new_event(self) -> None:
+        tracker = ReviewTracker()
+        review = _review()
+        tracker.update(review)
+        tracker.should_fire_start(
+            review.review_id, action_idx=0, events=[_event("ev1")]
+        )
+        assert (
+            tracker.should_fire_best(
+                review.review_id, action_idx=0, events=[_event("ev1"), _event("ev2")]
+            )
+            is True
+        )
+
+    def test_should_fire_best_improved_score(self) -> None:
+        tracker = ReviewTracker()
+        review = _review()
+        tracker.update(review)
+        tracker.should_fire_start(
+            review.review_id, action_idx=0, events=[_event(top_score=0.6)]
+        )
+        assert (
+            tracker.should_fire_best(
+                review.review_id, action_idx=0, events=[_event(top_score=0.9)]
+            )
+            is True
+        )
+
+    def test_should_fire_best_no_start_recorded(self) -> None:
+        tracker = ReviewTracker()
+        review = _review()
+        tracker.update(review)
+        assert (
+            tracker.should_fire_best(review.review_id, action_idx=0, events=[_event()])
+            is True
+        )
+
+    def test_should_fire_best_actions_independent(self) -> None:
+        tracker = ReviewTracker()
+        review = _review()
+        tracker.update(review)
+        evs = [_event()]
+        tracker.should_fire_start(review.review_id, action_idx=0, events=evs)
+        # action 1 never had start fired, so best should be allowed
+        assert (
+            tracker.should_fire_best(review.review_id, action_idx=1, events=evs) is True
+        )
+        # action 0 had start with same events, so best should be suppressed
+        assert (
+            tracker.should_fire_best(review.review_id, action_idx=0, events=evs)
+            is False
+        )
 
     def test_eviction(self) -> None:
         tracker = ReviewTracker(max_tracked=3)

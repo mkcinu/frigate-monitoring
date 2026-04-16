@@ -227,25 +227,36 @@ class FrigateListener:
             for action_idx, (action, filt, enabled) in enumerate(self._actions):
                 if not enabled:
                     continue
+
                 filtered_events = filt.filter_events(review.events)
                 if not filtered_events:
                     continue
+
                 filtered_review = _with_events(review, filtered_events)
-                if filt.triggers is not None:
-                    if filt.matches(filtered_review, trigger="start"):
-                        if self._tracker.should_fire_start(
-                            review.review_id, action_idx
-                        ):
-                            filtered_review.trigger = "start"
-                            nursery.start_soon(
-                                self._safe_handle, action, filtered_review
-                            )
-                    if is_end and filt.matches(filtered_review, trigger="best"):
-                        filtered_review.trigger = "best"
-                        nursery.start_soon(self._safe_handle, action, filtered_review)
-                else:
+
+                if filt.triggers is None:
                     if filt.matches(filtered_review):
                         nursery.start_soon(self._safe_handle, action, filtered_review)
+                    continue
+
+                if filt.matches(
+                    filtered_review, trigger="start"
+                ) and self._tracker.should_fire_start(
+                    review.review_id, action_idx, filtered_events
+                ):
+                    filtered_review.trigger = "start"
+                    nursery.start_soon(self._safe_handle, action, filtered_review)
+                    continue
+
+                if (
+                    is_end
+                    and filt.matches(filtered_review, trigger="best")
+                    and self._tracker.should_fire_best(
+                        review.review_id, action_idx, filtered_events
+                    )
+                ):
+                    filtered_review.trigger = "best"
+                    nursery.start_soon(self._safe_handle, action, filtered_review)
 
         if is_end:
             self._tracker.end(review.review_id)
