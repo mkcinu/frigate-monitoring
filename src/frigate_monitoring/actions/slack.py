@@ -71,9 +71,11 @@ class SlackAction(Action):
     When used with ``triggers: [start, best]``, the action tracks event keys
     (id, top_score, snapshot availability) at ``start`` time.  At ``best``:
 
-    * If ``attach_gif`` is ``True`` the message is always sent — the GIF alone
-      is worth sending regardless of whether event scores improved.
-    * If ``attach_gif`` is ``False`` and no event has changed since ``start``,
+    * Events that are identical to their ``start`` state are omitted from the
+      message — only new or improved events are shown.
+    * If ``attach_gif`` is ``True`` the message is sent even when no events
+      changed — the GIF alone is worth sending.
+    * If ``attach_gif`` is ``False`` and no event changed since ``start``,
       the ``best`` notification is suppressed entirely.
 
     Parameters
@@ -117,13 +119,18 @@ class SlackAction(Action):
 
     async def handle(self, review: FrigateReview) -> None:
         """Send the Slack notification."""
-        event_keys = frozenset(e.key for e in review.events)
         if review.trigger == "start":
-            self._start_event_keys[review.review_id] = event_keys
-        elif review.trigger == "best" and not self.attach_gif:
+            self._start_event_keys[review.review_id] = frozenset(
+                e.key for e in review.events
+            )
+        elif review.trigger == "best":
             start = self._start_event_keys.get(review.review_id)
-            if start is not None and event_keys == start:
-                return
+            if start is not None:
+                changed = [e for e in review.events if e.key not in start]
+                if not changed and not self.attach_gif:
+                    return
+                review = attrs.evolve(review)
+                review.events = changed
 
         tpl_vars = review.as_template_vars()
         title_text = render_template(self.title, tpl_vars)
